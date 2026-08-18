@@ -29,6 +29,15 @@ class ModelConfig:
     lang_cond_dropout: float = 0.1
 
 
+def model_preset(name: str) -> ModelConfig:
+    """The two frozen backbone sizes of design §3 (task 1.2)."""
+    presets = {
+        "25m": ModelConfig(),
+        "85m": ModelConfig(n_layers=12, d_model=768, n_heads=12, d_ffn=2048),
+    }
+    return presets[name]
+
+
 @dataclass
 class DataConfig:
     corpus_version: str = CORPUS_VERSION
