@@ -1,7 +1,7 @@
 [project]
-name = "voynich-entropy"
+name = "diff-voyn"
 version = "0.0.1"
-description = "Voynich manuscript entropy analysis"
+description = "decoding with diffusion"
 requires-python = "==3.12.*"
 
 # Base dependencies — always installed (CPU + GPU)
@@ -55,4 +55,7 @@ requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = []  # Root project has no importable packages itself
+include = ["diff_voyn*"]
+
+[tool.isort]
+profile = "black"

@@ -29,7 +29,7 @@ curl -fsSL https://claude.ai/install.sh | bash
 
 # ---------- Python environment ----------
 cd /workspace
-git submodule update --init --recursive
+
 
 DEVICE="${DEVICE:-cpu}"
 echo "=== Setting up Python environment (${DEVICE}) ==="
@@ -37,18 +37,13 @@ echo "=== Setting up Python environment (${DEVICE}) ==="
 if [ "$DEVICE" = "cuda" ]; then
     # Install base deps + GPU dependency group
     uv sync --group gpu
-    # # Make both submodules importable (deps already resolved by root)
-    # uv pip install -e ./blt --no-deps
-    # uv pip install -e ./voynich-attack --no-deps
+
 else
     # Install base deps only
     uv sync
-    # # Make submodules importable (deps already resolved by root)
-    # uv pip install -e ./blt --no-deps
-    # uv pip install -e ./voynich-attack --no-deps
+
 fi
 
-# Register Jupyter kernel
-uv run python -m ipykernel install --user --name voynich-entropy --display-name "Voynich Entropy"
+
 
 echo "=== Setup complete (${DEVICE}) ==="

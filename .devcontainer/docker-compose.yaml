@@ -1,7 +1,7 @@
 version: '3'
 
 services:
-  devcontainer-gpu:
+  diffvoyn-gpu:
     build:
       context: ..
       dockerfile: .devcontainer/Dockerfile
@@ -28,7 +28,7 @@ services:
     command: sleep infinity
 
 
-  devcontainer-cpu:
+  diffvoyn-cpu:
     build:
       context: ..
       dockerfile: .devcontainer/Dockerfile

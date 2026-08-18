@@ -9,3 +9,10 @@ __MACOSX
 
 # all checcpoint files
 *.ckpt
+
+# python
+__pycache__/
+*.egg-info/
+.venv
+.pytest_cache
+.ruff_cache
