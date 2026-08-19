@@ -154,6 +154,23 @@ class Backbone(nn.Module):
             h = block(h, self.rotary)
         return subs_parameterize(self.head(self.final_norm(h)))
 
+    def forward_soft(
+        self,
+        probs: torch.Tensor,
+        lang_idx: torch.Tensor,
+        g: torch.Generator | None = None,
+    ) -> torch.Tensor:
+        """Mixture-input path (task 5.1 / design §8, R3): ``probs``
+        [B, L, VOCAB_SIZE] row-stochastic distributions are fed as expected
+        embeddings ``probs @ E``. With one-hot rows this reproduces
+        :meth:`forward` exactly; soft rows carry dense gradients to a cipher
+        head. No parameters differ from the id path."""
+        h = probs @ self.embed.weight + self.lang_cond(lang_idx, g)
+        h = self.embed_dropout(h)
+        for block in self.blocks:
+            h = block(h, self.rotary)
+        return subs_parameterize(self.head(self.final_norm(h)))
+
     def n_params(self) -> int:
         return sum(p.numel() for p in self.parameters())
 
