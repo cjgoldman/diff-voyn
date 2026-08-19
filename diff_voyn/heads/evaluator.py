@@ -244,10 +244,147 @@ class NgramEvaluator(EvaluatorBase):
                 alpha = torch.logaddexp(alpha, b)
         return torch.logsumexp(alpha.reshape(-1), dim=0)
 
+    # -- char-lattice segmental DP (rung 4) ----------------------------------
+    #
+    # Like ``score_hard``, these are NgramEvaluator-only inner-loop scorers
+    # (not part of the frozen protocol): the rung-4 head's segmentation is
+    # latent over CHAR positions, not pre-parsed tokens, so the DP runs over a
+    # (position, segment-length) lattice. Post-G4, rung 4 keeps this n-gram DP
+    # as its inner search and rescores shortlisted hard decodes with the
+    # diffusion evaluator (the design's shortlist convention).
+
+    def score_lattice(
+        self,
+        log_emis: torch.Tensor,
+        seg_lengths: list[int],
+        *,
+        language: str,
+        order: int = 3,
+        start_window: int = 1,
+        end_window: int = 1,
+    ) -> torch.Tensor:
+        """Marginal log-likelihood over segmentations of a char stream.
+
+        ``log_emis[i, j, :]`` is the (A,) log emission weight of the segment
+        starting at char ``i`` with length ``seg_lengths[j]`` (use a large
+        negative constant, NOT -inf, for inadmissible segments — an all
+        -inf ``logsumexp`` NaNs in backward). Differentiable w.r.t.
+        ``log_emis``. ``order`` is 2 (state = last letter) or 3.
+
+        ``start_window``/``end_window`` > 1 let the parse begin within the
+        first / terminate within the last that many positions instead of
+        covering all L chars exactly — the right semantics for a mid-stream
+        chunk whose edges need not align with segment boundaries (an
+        edge-misaligned dead lattice otherwise returns the ~-1e30 sentinel
+        and its gradient blows up the caller's parameters).
+        """
+        L = int(log_emis.shape[0])
+        neg = torch.full((), -1e30, dtype=log_emis.dtype)
+        if order == 2:
+            logT2 = self.logT(language, 2).to(log_emis.dtype)
+            start2 = self.logT(language, 1).to(log_emis.dtype)
+            alphas: list[torch.Tensor] = [start2]
+            for i in range(1, L + 1):
+                outs = [
+                    torch.logsumexp(alphas[i - n][:, None] + logT2, dim=0)
+                    + log_emis[i - n, j]
+                    for j, n in enumerate(seg_lengths)
+                    if i - n >= 0
+                ]
+                if i < start_window:  # parse may begin at position i
+                    outs.append(start2)
+                alphas.append(_stack_lse(outs, neg, (A,), log_emis.dtype))
+        elif order == 3:
+            logT3 = self.logT(language, 3).to(log_emis.dtype)
+            start = (self.logT(language, 1)[:, None] + self.logT(language, 2)).to(
+                log_emis.dtype
+            )
+            alphas = [start]
+            for i in range(1, L + 1):
+                outs = []
+                for j, n in enumerate(seg_lengths):
+                    if i - n < 0:
+                        continue
+                    inner = torch.logsumexp(alphas[i - n][:, :, None] + logT3, dim=0)
+                    outs.append(inner + log_emis[i - n, j][None, :])
+                if i < start_window:
+                    outs.append(start)
+                alphas.append(_stack_lse(outs, neg, (A, A), log_emis.dtype))
+        else:
+            raise NotImplementedError("lattice DP supports order 2 or 3")
+        ends = [alphas[i].reshape(-1) for i in range(max(L - end_window + 1, 1), L + 1)]
+        return torch.logsumexp(torch.cat(ends), dim=0)
+
+    def viterbi_lattice(
+        self,
+        log_emis: torch.Tensor,
+        seg_lengths: list[int],
+        *,
+        language: str,
+    ) -> tuple[np.ndarray, np.ndarray, float]:
+        """Max-probability segmentation + letters (trigram state).
+
+        Returns (segment start positions, letter ids, path log-prob).
+        """
+        with torch.no_grad():
+            logT3 = self.logT(language, 3).to(log_emis.dtype)
+            L = int(log_emis.shape[0])
+            beta = [
+                (self.logT(language, 1)[:, None] + self.logT(language, 2)).to(
+                    log_emis.dtype
+                )
+            ]
+            back: list[tuple | None] = [None]
+            for i in range(1, L + 1):
+                cands, metas = [], []
+                for j, n in enumerate(seg_lengths):
+                    if i - n < 0:
+                        continue
+                    # (a, b, c) -> max over a
+                    x = beta[i - n][:, :, None] + logT3
+                    inner, arg_a = x.max(dim=0)
+                    cands.append(inner + log_emis[i - n, j][None, :])
+                    metas.append((n, arg_a))
+                if not cands:
+                    beta.append(torch.full((A, A), -1e30, dtype=log_emis.dtype))
+                    back.append(None)
+                    continue
+                stacked = torch.stack(cands)  # (k, A, A)
+                best, arg_k = stacked.max(dim=0)
+                beta.append(best)
+                back.append((metas, arg_k))
+            flat = int(beta[L].argmax())
+            b, c = divmod(flat, A)
+            score = float(beta[L][b, c])
+            i, starts, letters = L, [], []
+            while i > 0 and back[i] is not None:
+                metas, arg_k = back[i]
+                k = int(arg_k[b, c])
+                n, arg_a = metas[k]
+                starts.append(i - n)
+                letters.append(c)
+                a = int(arg_a[b, c])
+                i, b, c = i - n, a, b
+            return (
+                np.array(starts[::-1], dtype=np.int64),
+                np.array(letters[::-1], dtype=np.int64),
+                score,
+            )
+
     # -- diffusion-only path -------------------------------------------------
 
     def as_embedding_frame(self, soft_letters, null_weights):  # pragma: no cover
         raise NotImplementedError("n-gram evaluator does not consume the frame")
+
+
+def _stack_lse(
+    outs: list[torch.Tensor], neg: torch.Tensor, shape: tuple, dtype
+) -> torch.Tensor:
+    if not outs:
+        return neg.expand(shape).to(dtype).clone()
+    if len(outs) == 1:
+        return outs[0]
+    return torch.logsumexp(torch.stack(outs), dim=0)
 
 
 def _finite_w(w) -> bool:

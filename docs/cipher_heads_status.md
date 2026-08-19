@@ -181,9 +181,43 @@ slightly, e.g. -40010 vs -39889 — the residual is search, not objective),
 larger restart/step budgets, VMS-scale DP vectorization. Restart budget so
 far: 2-3 restarts of 250-350 chunked-SGD steps each.
 
+## CH.8 — rung 4, arithmetic sum-to-target head ✅ acceptance met (2026-08-19)
+
+`diff_voyn/heads/rung4_arithmetic.py` + char-lattice semi-Markov DP
+(`NgramEvaluator.score_lattice` / `viterbi_lattice`, verified against
+brute-force enumeration and the token-level segmental DP);
+`gen_arithmetic` ground truth on the Phase-0-pinned per-language
+`pseudo_vms` tables. Full design record with all measured numbers:
+**[rung4_arithmetic_design.md](rung4_arithmetic_design.md)** (the §10
+design note the plan asks for). Highlights:
+
+- Identifiability chain, each link measured: canonical char order recovered
+  from ciphertext by exact LOP + a factorized boundary-model tie-break (raw
+  LOP is *exactly* degenerate; cyclic rotations killed by the min-token-
+  length constraint) → admissibility prunes ~60% of the segment lattice →
+  order-derived `v` (split 2) reproduces the true char values exactly →
+  `u` becomes a Gumbel–Sinkhorn assignment between integer segment sums
+  and letters over the lattice DP (a scalar Gaussian-kernel `u` cannot
+  travel and collapses the value scale — measured, documented).
+- True-key Viterbi: SER 0.7%, boundary recall 99.7% (scorer ~lossless).
+- **Measured reversal of the rung-2 KL defense**: the emission-posterior
+  frequency proxy penalizes the TRUE key (~320 nats/300 letters) and flips
+  the objective ordering; with it off the truth outscores every found key
+  and polish-from-truth stays exactly at the truth. The assignment's
+  injectivity is the structural defense; `freq_penalty_weight` defaults 0.
+- **Acceptance 5.5 (language recovery better than family-random): met.**
+  Probe (2 instances/language × 3 conditions, common seed, calibrated
+  bits/char): language top-1 **4/6**, family top-1 **5/6** (random: 2/6 and
+  ~3.3/6); both misses within 0.02 bits/char; latin t0 recovered the
+  complete key from scratch (u map acc 1.000, SER 0.003). Best config
+  (head defaults): 400 Sinkhorn steps, 768-char chunks, 2 restarts,
+  ~15–25 min/solve single-threaded. `data/cipher_heads/rung4_probe.json`.
+
 ## Deliberately deferred
 
-- `SmallARLMEvaluator` (CH.7), rung 4 (CH.8) + its design note, anchor-data
-  fetch, DP vectorization for VMS-scale (38k tokens) rung-3 runs.
-- Full-grid acceptance runs (50 ciphers/cell) — current numbers are 3–5
+- `SmallARLMEvaluator` (CH.7), anchor-data fetch, DP vectorization for
+  VMS-scale (38k tokens ≈ 160k chars) rung-3/4 runs.
+- Full-grid acceptance runs (50 ciphers/cell) — current numbers are 2–5
   trials/cell smoke levels.
+- Rung-4 next levers (design note §6): more restarts for the 0.02-bit
+  near-misses, exact-EM interleave on the assignment, pair-swap polish.

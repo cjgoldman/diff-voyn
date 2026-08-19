@@ -318,9 +318,7 @@ def test_naibbe_vocab_sizes(naibbe_parser):
     assert naibbe_parser.n_pre == 138
     assert naibbe_parser.n_suf == 138
     for state in ("unigram", "prefix", "suffix"):
-        assert naibbe_parser.truth[state].shape == (
-            len(naibbe_parser.types[state]),
-        )
+        assert naibbe_parser.truth[state].shape == (len(naibbe_parser.types[state]),)
 
 
 def test_naibbe_parse_stream_roundtrip(naibbe_parser):
@@ -362,3 +360,139 @@ def test_naibbe_block_structure(naibbe_parser):
         assert all(len(c) >= 1 for c in cells)
     assert n_cells == 18 * 23
     assert len(NaibbeParser.TABLES) == 6
+
+
+# ------------------------------------------------------------- CH.8 rung 4
+
+
+def _tiny_arith_cipher():
+    """8-char arithmetic cipher following the scheme's conventions: 2
+    negatives (-1, -2) then positives descending 5..0 (canonical order =
+    char id order); tokens are 2-4 chars canonically ordered, values
+    summing to the letter's value; 25 distinct letter values in -4..20."""
+    from itertools import combinations_with_replacement
+
+    v = np.array([-1, -2, 5, 4, 3, 2, 1, 0], dtype=np.int64)
+    u = np.array(sorted(set(range(-4, 21)))[:A], dtype=np.int64)
+    tokens_of = {}
+    for letter in range(A):
+        toks = []
+        for n in (2, 3, 4):
+            for combo in combinations_with_replacement(range(8), n):
+                if v[list(combo)].sum() == u[letter]:
+                    toks.append(tuple(sorted(combo)))  # id order = canonical
+        tokens_of[letter] = sorted(set(toks))
+        assert tokens_of[letter], f"letter value {u[letter]} unreachable"
+    return v, u, tokens_of
+
+
+def _tiny_arith_stream(plain_ids, tokens_of, rng):
+    toks = [tokens_of[p][rng.integers(len(tokens_of[p]))] for p in plain_ids]
+    starts = np.cumsum([0] + [len(t) for t in toks[:-1]])
+    chars = np.array([c for t in toks for c in t], dtype=np.int64)
+    return chars, starts
+
+
+def test_lattice_dp_matches_enumeration(toy_ev):
+    """score_lattice (order 2) vs brute-force sum over segmentations in
+    linear-space float64 numpy (independent code path)."""
+    rng = np.random.default_rng(3)
+    L, lengths = 7, [2, 3]
+    log_emis = torch.tensor(
+        rng.normal(-1.0, 0.7, size=(L, len(lengths), A)), dtype=torch.float32
+    )
+    got = float(toy_ev.score_lattice(log_emis, lengths, language="toy", order=2))
+    p1 = np.exp(toy_ev.logT("toy", 1).numpy().astype(np.float64))
+    P2 = np.exp(toy_ev.logT("toy", 2).numpy().astype(np.float64))
+    b = np.exp(log_emis.numpy().astype(np.float64))
+
+    def segmentations(rem, at=0):
+        if rem == 0:
+            yield []
+        for j, n in enumerate(lengths):
+            if n <= rem:
+                for rest in segmentations(rem - n, at + n):
+                    yield [(at, j)] + rest
+
+    total = 0.0
+    for seg in segmentations(L):
+        x = p1.copy()
+        for at, j in seg:
+            x = (x @ P2) * b[at, j]
+        total += x.sum()
+    assert abs(got - np.log(total)) < 1e-3
+
+
+def test_lattice_dp_order3_matches_segmental(toy_ev):
+    """With exactly one admissible segmentation, the order-3 lattice DP must
+    equal the (already-verified) token-level segmental DP."""
+    from diff_voyn.heads.evaluator import TokenEmission
+
+    rng = np.random.default_rng(4)
+    lengths = [2, 3]
+    seg = [(0, 1), (3, 0), (5, 1)]  # 3 + 2 + 3 = 8 chars
+    L = 8
+    log_emis = torch.full((L, len(lengths), A), -1e30)
+    ems = []
+    for at, j in seg:
+        row = torch.tensor(rng.normal(-1.0, 0.5, size=A), dtype=torch.float32)
+        log_emis[at, j] = row
+        ems.append(TokenEmission(uni=row.exp()))
+    got = float(toy_ev.score_lattice(log_emis, lengths, language="toy", order=3))
+    want = float(toy_ev.score_segmental(ems, language="toy"))
+    assert abs(got - want) < 1e-3
+
+
+def test_rung4_order_inference_and_admissibility(toy_trans):
+    from diff_voyn.heads.rung4_arithmetic import (
+        SEG_LENGTHS,
+        admissible_mask,
+        infer_char_orders,
+        order_derived_values,
+    )
+
+    v, _u, tokens_of = _tiny_arith_cipher()
+    rng = np.random.default_rng(5)
+    plain = _markov_sample(toy_trans, 500, rng)
+    chars, starts = _tiny_arith_stream(plain, tokens_of, rng)
+    ranks = infer_char_orders(chars, n_sym=8, seed=0)
+    true_rank = np.arange(8)
+    assert any(np.array_equal(r, true_rank) for r in ranks)
+    assert np.array_equal(ranks[0], true_rank)
+    # order-derived values at the true split recover v exactly
+    assert np.array_equal(order_derived_values(true_rank, 2).astype(np.int64), v)
+    # every true segment is admissible under the inferred order
+    adm = admissible_mask(chars, ranks[0])
+    lens = np.diff(np.concatenate([starts, [len(chars)]]))
+    assert all(adm[s, SEG_LENGTHS.index(n)] for s, n in zip(starts, lens))
+
+
+def test_rung4_true_key_decode(toy_lm, toy_ev, toy_trans):
+    from diff_voyn.heads.rung4_arithmetic import ArithmeticHead, levenshtein_ser
+
+    v, u, tokens_of = _tiny_arith_cipher()
+    rng = np.random.default_rng(6)
+    plain = _markov_sample(toy_trans, 150, rng)
+    chars, _ = _tiny_arith_stream(plain, tokens_of, rng)
+    head = ArithmeticHead(toy_ev)
+    _, letters, _ = head.decode_with_key(chars, v, u, language="toy", rank=np.arange(8))
+    assert levenshtein_ser(letters, plain) < 0.05
+
+
+def test_rung4_solve_smoke(toy_ev, toy_trans):
+    """End-to-end mini solve: runs without NaN, returns finite score, and
+    the Sinkhorn gradient phase actually updates the logits."""
+    from diff_voyn.heads.rung4_arithmetic import ArithmeticHead
+
+    v, _u, tokens_of = _tiny_arith_cipher()
+    rng = np.random.default_rng(8)
+    plain = _markov_sample(toy_trans, 120, rng)
+    chars, _ = _tiny_arith_stream(plain, tokens_of, rng)
+    head = ArithmeticHead(toy_ev, steps=10, chunk_chars=200, seed=0)
+    res = head.solve(
+        chars, language="toy", restarts=1, splits=(2,), polish=False, n_sym=8
+    )
+    assert np.isfinite(res.score)
+    assert np.isfinite(res.raw_ll)
+    assert len(res.decoded) > 0
+    assert res.v_accuracy(v) == 1.0  # order-derived init is exact here

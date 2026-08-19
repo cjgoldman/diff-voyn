@@ -12,6 +12,7 @@ language-recovery probe.
 
 from __future__ import annotations
 
+import random as pyrandom
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -90,6 +91,55 @@ def gen_homophonic(
     )
     return SyntheticCipher(
         "homophonic", language, plain_ids, cipher, n_symbols, true_map
+    )
+
+
+@dataclass
+class ArithmeticInstance:
+    """Rung-4 ground truth: the head consumes ``char_ids`` (whitespace
+    stripped, symbol ids under a random permutation so no code path can leak
+    the natural hex order); everything else is validation-only."""
+
+    language: str
+    plain_ids: np.ndarray  # (n_letters,) 0..A-1
+    char_ids: np.ndarray  # (n_chars,) 0..15 — unsegmented stream
+    token_starts: np.ndarray  # (n_letters,) true segment start positions
+    true_v: np.ndarray  # (16,) char id -> integer value
+    true_u: np.ndarray  # (A,) letter -> integer value
+    true_rank: np.ndarray  # (16,) char id -> canonical-order position
+
+
+def gen_arithmetic(
+    plain_ids: np.ndarray, language: str, cipher, rng: np.random.Generator
+) -> ArithmeticInstance:
+    """Encipher held-out plaintext with a pinned ``ArithmeticCipher`` and
+    emit the whitespace-stripped stream + full ground truth."""
+    from ..vocab import LETTERS
+    from .ngram import LETTER_TO_IDX
+
+    text = "".join(LETTERS[i] for i in plain_ids)
+    pyrng = pyrandom.Random(int(rng.integers(2**31)))
+    tokens = cipher.enc.encode(text, rng=pyrng).split()
+    assert len(tokens) == len(plain_ids)
+
+    from voynpy.pseudo_vms.encoder import HEX_CHARS, HEX_VALUE
+
+    hex_order = "EFDCBA9876543210"  # canonical within-token order
+    perm = rng.permutation(len(HEX_CHARS))  # hex index -> shuffled symbol id
+    sym_of = {c: int(perm[i]) for i, c in enumerate(HEX_CHARS)}
+    true_v = np.empty(len(HEX_CHARS), dtype=np.int64)
+    true_rank = np.empty(len(HEX_CHARS), dtype=np.int64)
+    for c in HEX_CHARS:
+        true_v[sym_of[c]] = HEX_VALUE[c]
+        true_rank[sym_of[c]] = hex_order.index(c)
+    char_ids = np.array([sym_of[c] for t in tokens for c in t], dtype=np.int64)
+    lens = np.array([len(t) for t in tokens])
+    token_starts = np.concatenate([[0], np.cumsum(lens)[:-1]])
+    true_u = np.full(A, -(10**6), dtype=np.int64)
+    for letter, value in cipher.enc.alphabet.items():
+        true_u[LETTER_TO_IDX[letter]] = value
+    return ArithmeticInstance(
+        language, plain_ids, char_ids, token_starts, true_v, true_u, true_rank
     )
 
 
