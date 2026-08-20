@@ -8,4 +8,7 @@ from .checkpoint import load_checkpoint, save_checkpoint  # noqa: F401
 from .config import RunConfig, config_hash  # noqa: F401
 from .ema import EMA  # noqa: F401
 from .manifest import build_run_manifest  # noqa: F401
-from .nelbo import estimate_nelbo_bits_per_char  # noqa: F401
+from .nelbo import (  # noqa: F401
+    estimate_nelbo_bits_per_char,
+    per_window_nelbo_bits,
+)
