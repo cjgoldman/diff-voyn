@@ -16,7 +16,10 @@ Pieces:
   with p=0.1 conditioning dropout to a learned NULL-language embedding
   (design §4). Included here so injection mechanics are testable in Phase 0;
   the Phase-1 model composes it.
-- :class:`DiffVoynIterableDataset` — infinite stream of training examples.
+- :class:`DiffVoynIterableDataset` — infinite stream of training examples;
+  with a :class:`~diff_voyn.data.noise.NoiseMixture` attached (Phase B, tasks
+  2.4/2.5) each example is drawn as clean / noised / NULL-framed / both, and
+  the example kind is emitted for logging.
 """
 
 from __future__ import annotations
@@ -30,6 +33,7 @@ import torch
 from torch import nn
 
 from ..vocab import MASK_ID, TOKEN_TO_ID
+from .noise import KIND_CLEAN, NoiseMixture
 
 # Frozen inventory (task 0.2) in frozen index order.
 LANG_TO_INDEX: dict[str, int] = {"latin": 0, "italian": 1, "german": 2}
@@ -183,7 +187,13 @@ class LanguageConditioning(nn.Module):
 
 
 class DiffVoynIterableDataset(torch.utils.data.IterableDataset):
-    """Infinite stream: {ids, z_t, mask, t, weight, lang_idx}."""
+    """Infinite stream: {ids, z_t, mask, t, weight, lang_idx, kind, sub_severity}.
+
+    ``kind`` is the example type (``noise.KIND_*``; always 0 = clean without a
+    mixture) and ``sub_severity`` the wrong-key severity applied (0 if none) —
+    both are consumed only by logging, so the realized Phase-B mix is
+    auditable on the dashboard.
+    """
 
     def __init__(
         self,
@@ -191,6 +201,7 @@ class DiffVoynIterableDataset(torch.utils.data.IterableDataset):
         seq_len: int = 1024,
         temperature: float = 0.7,
         seed: int = 0,
+        noise: NoiseMixture | None = None,
     ):
         super().__init__()
         self.windows = windows
@@ -198,6 +209,7 @@ class DiffVoynIterableDataset(torch.utils.data.IterableDataset):
         self.sampler = LanguageSampler(windows.chars, temperature)
         self.masking = MaskingSampler()
         self.seed = seed
+        self.noise = noise
 
     def __iter__(self) -> Iterator[dict]:
         info = torch.utils.data.get_worker_info()
@@ -206,9 +218,17 @@ class DiffVoynIterableDataset(torch.utils.data.IterableDataset):
         g = torch.Generator().manual_seed(self.seed * 1000 + wid)
         while True:
             lang = self.sampler.sample(rng)
-            ids = torch.from_numpy(
-                self.windows.sample_window(lang, self.seq_len, rng).astype(np.int64)
-            )[None, :]
+            kind, sub_severity = KIND_CLEAN, 0.0
+            if self.noise is None:
+                window = self.windows.sample_window(lang, self.seq_len, rng)
+            else:
+                kind = self.noise.sample_kind(rng)
+                source = self.windows.sample_window(
+                    lang, self.noise.source_length(kind, self.seq_len), rng
+                )
+                window, ninfo = self.noise.apply(source, kind, self.seq_len, rng)
+                sub_severity = ninfo.get("substitution", {}).get("severity", 0.0)
+            ids = torch.from_numpy(window.astype(np.int64))[None, :]
             t = self.masking.sample_t(1, g)
             z_t, masked, weight = self.masking.mask(ids, t, g)
             yield {
@@ -218,4 +238,6 @@ class DiffVoynIterableDataset(torch.utils.data.IterableDataset):
                 "t": t[0],
                 "weight": weight[0],
                 "lang_idx": torch.tensor(LANG_TO_INDEX[lang]),
+                "kind": torch.tensor(kind),
+                "sub_severity": torch.tensor(sub_severity, dtype=torch.float32),
             }

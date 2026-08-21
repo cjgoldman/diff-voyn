@@ -79,3 +79,33 @@ def load_checkpoint(
             for i in range(n):
                 torch.cuda.set_rng_state(rng["torch_cuda"][i], i)
     return state
+
+
+def load_backbone(path: Path, device: str = "cpu", *, ema: bool = True):
+    """Build the backbone recorded in a training checkpoint and load its EMA
+    (default) or raw weights. Returns ``(model.eval(), meta)`` where ``meta``
+    carries path/step/ema_decay/schedule/model config for reports."""
+    from ..infra.config import ModelConfig
+    from ..model.backbone import Backbone
+
+    state = torch.load(path, map_location="cpu", weights_only=False)
+    cfg = ModelConfig(**state["extra"]["config"]["model"])
+    model = Backbone(cfg).to(device).eval()
+    model.load_state_dict(state["model"])
+    source = "raw"
+    if ema and state.get("ema") is not None:
+        sd = model.state_dict()
+        for k, v in state["ema"]["shadow"].items():
+            sd[k].copy_(v.to(sd[k].dtype))
+        source = "ema"
+    meta = {
+        "path": str(path),
+        "step": state["step"],
+        "weights": source,
+        "ema_decay": state["ema"]["decay"] if state.get("ema") else None,
+        "schedule": state["extra"].get("schedule"),
+        "model": state["extra"]["config"]["model"],
+        "phase": state["extra"]["config"].get("phase"),
+        "run_name": state["extra"]["config"].get("run_name"),
+    }
+    return model, meta

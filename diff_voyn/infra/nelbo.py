@@ -110,3 +110,43 @@ def per_window_nelbo_bits(
         total += (nll.sum(dim=-1) / (t * seq_len)).double().cpu()
 
     return (total / n_strata / math.log(2.0)).float()
+
+
+@torch.no_grad()
+def per_position_nelbo_bits(
+    model: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
+    ids: torch.Tensor,
+    lang_idx: int,
+    *,
+    n_strata: int = 16,
+    seed: int = 0,
+    device: str | torch.device = "cpu",
+    t_floor: float = 1e-3,
+) -> torch.Tensor:
+    """Per-position NELBO contributions [B, L] in bits, same estimator and CRN
+    semantics as :func:`per_window_nelbo_bits`; ``out.mean(-1)`` equals that
+    function's per-window bits/char for the same seed. Used to split the
+    bound between slot classes (NULL vs letter slots of a 2N frame, task 2.5)
+    and to localize where a noised window pays (task 2.6)."""
+    from ..vocab import MASK_ID
+
+    g = torch.Generator(device="cpu").manual_seed(seed)
+    ids = ids.to(device)
+    batch, seq_len = ids.shape
+    lang = torch.full((batch,), lang_idx, dtype=torch.long, device=device)
+
+    total = torch.zeros(batch, seq_len, dtype=torch.float64)
+    for s in range(n_strata):
+        u = torch.rand(1, generator=g).item()
+        t = max((s + u) / n_strata, t_floor)
+        mask_draw = torch.rand(batch, seq_len, generator=g).to(device)
+        masked = mask_draw < t
+        if not masked.any():
+            continue
+        z_t = ids.masked_fill(masked, MASK_ID)
+        logp = F.log_softmax(model(z_t, lang).float(), dim=-1)
+        nll = -logp.gather(-1, ids.unsqueeze(-1)).squeeze(-1)
+        nll = nll.masked_fill(~masked, 0.0)
+        total += (nll / t).double().cpu()
+
+    return (total / n_strata / math.log(2.0)).float()

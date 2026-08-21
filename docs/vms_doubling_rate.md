@@ -9,6 +9,8 @@
 | measurement script (rates, hand/dialect/section breakdowns) | `scripts/doubling_rate.py` |
 | geminate-collapse script | `scripts/doubling_collapse.py` |
 | full tables | `data/analysis/doubling/doubling_report.md`, `collapse_report.md` (+ `.json`) |
+| Naibbe ciphertext doubling (added 2026-08-21) | `scripts/naibbe_doubling.py` → `data/analysis/doubling/naibbe_doubling.md` (+ `.json`) |
+| Naibbe deck / sticky sweep vs Greshko's metrics | `scripts/naibbe_deck_sweep.py` → `data/analysis/doubling/naibbe_deck_sweep.md` (+ `.json`; ~8 min) |
 
 ## 1. The question
 
@@ -153,6 +155,103 @@ and the hands do correlate with Currier A/B.
 from "s ≈ 0.25 over uncollapsed text": both reproduce 9.2/1000 exactly. They
 differ in the plaintext alphabet (≈25 vs ≈31–33 symbols).
 
+## 5b. What the Naibbe cipher produces (added 2026-08-21)
+
+Same statistic, measured on Naibbe v2 ciphertext (pinned wrapper
+`diff_voyn.ciphers.naibbe`, greshko/naibbe-cipher @ `df3d074`; 300k
+normalized characters per language from corpora v1, 3 seeds, both the
+52- and 78-card decks; `scripts/naibbe_doubling.py`):
+
+| plaintext | Naibbe doubling /1000 (95 %) | adjacent same unit /1000 | P(same token \| same unit) | if s = 1 |
+|---|---:|---:|---:|---:|
+| Latin | **1.6** (1.5–1.7) | 8.2 | 0.19–0.21 | 8.1 |
+| Italian | **2.2** (2.1–2.4) | 10.7 | 0.20–0.22 | 10.7 |
+| German | **3.0–3.3** (2.9–3.4) | 16.0 | 0.18–0.21 | 15.6 |
+
+(52 vs 78 cards differ by < 0.2/1000; seeds by ≈ ±0.1.)
+
+**No — Naibbe as specified gives 1.6–3.3/1000, three to six times below the
+VMS's ~9.** The decomposition says why. A Naibbe token doubles only when the
+respacing step emits the same unit twice *and* the card deck draws the same
+table(s) again; no two different units ever produce the same token
+(`UNAMBIGUOUS = True`, zero cross-unit collisions in 1.2 M pairs). The deck
+(alpha 20 / beta 3×8 / gamma 2×4 of 52) gives P(same table twice) ≈ 0.23 for
+a unigram unit, and ≈ 0.05 for a bigram (both prefix and suffix tables must
+repeat), so the effective reuse probability is s ≈ 0.20 — Naibbe's card deck
+is a *low*-s mechanism by construction, lower than the 0.21–0.35 the
+plaintext-letter inversion in §4 requires, and it applies to a unit stream
+whose adjacent-repeat rate (8–16/1000) is already far below the raw letter
+rate (26–44/1000) because half of the units are bigrams, which almost never
+repeat (0.7–1.2/1000).
+
+Two observations follow:
+
+- **Naibbe's mixed unigram/bigram respacing is a third route to ~9/1000.**
+  With no table randomisation (s = 1) the unit stream alone doubles at
+  8.1 (Latin), 10.7 (Italian), 15.6 (German) per 1000 — Latin and Italian
+  land inside the measured VMS range (6.6–10.4) with *no geminate collapse*,
+  because the 53 % bigram units dilute the letter doublings instead of the
+  orthography absorbing them. This is the same structural move as §5
+  (mixed unigram–digraph alphabet) arrived at from the other side. German
+  overshoots as it does in §5.
+- **The deck is the lever.** To hit 9/1000 Naibbe needs effective s ≈ 1.1
+  (Latin), 0.85 (Italian), 0.58 (German) — i.e. essentially deterministic
+  table choice for Latin/Italian, or a strongly concentrated deck. Greshko's
+  deck with alpha at 20/52 cannot get there; the rung-3 head should not
+  assume the pinned generator reproduces the VMS doubling rate, and any
+  "Naibbe-tuned" synthetic corpus for Phase 6 needs either a table-reuse
+  parameter (like the arithmetic head's `doubling_strength`) or an explicit
+  statement that it under-doubles by 3–6×.
+
+The doubled Naibbe tokens are the usual suspects (`qokeey`, `shedy`, `qokal`,
+`qokain`, `chey`) — Greshko's table glyphs already look like the VMS's most
+doubled words, which is a cosmetic rather than a statistical match.
+
+## 5c. Does fixing the table choice break Naibbe's other matches? (added 2026-08-21)
+
+Two ways of making the table choice (more) deterministic, scored on
+Greshko's metric set against the VMS computed with the same code on the
+same 30 000-token budget (`scripts/naibbe_deck_sweep.py` →
+`data/analysis/doubling/naibbe_deck_sweep.md`; Latin shown, Italian and
+German behave identically):
+
+| variant | dbl /1000 | types | TTR | hapax | Zipf slope | H(word) | h1 | h2 | mean len |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| **VMS (IT2a)** | 8.9 | 6846 | 0.228 | 0.70 | −1.03 | 10.31 | 3.87 | 2.14 | 5.15 |
+| Naibbe stock deck | 2.7 | 5332 | 0.178 | 0.44 | −0.91 | 10.16 | 3.88 | 2.12 | 5.32 |
+| deck alpha = 0.7 | 6.5 | 3615 | 0.120 | 0.47 | −1.00 | 9.12 | 3.86 | 1.97 | 5.20 |
+| deck alpha = 0.9 | 11.3 | 2118 | 0.071 | 0.44 | −1.24 | 8.01 | 3.84 | 1.84 | 5.13 |
+| single table (alpha = 1) | 16.5 | **403** | 0.013 | 0.11 | −1.68 | 6.69 | 3.81 | 1.62 | 5.05 |
+| **sticky-on-repeat s = 0.5** | **8.3** | 5331 | 0.178 | 0.44 | −0.91 | 10.16 | 3.88 | 2.12 | 5.32 |
+| sticky-on-repeat s = 1.0 | 14.1 | 5329 | 0.178 | 0.44 | −0.91 | 10.16 | 3.88 | 2.12 | 5.32 |
+
+(The stock rate in this 30k sample, 2.7, is higher than the 1.6 of §5b's
+300k run — the first Latin document doubles more than the corpus average;
+the statistic is text-dependent at the ±1/1000 level.)
+
+- **Concentrating the deck wrecks the paper's matches.** By the time
+  doubling reaches the VMS (alpha ≈ 0.85–0.9), the vocabulary has fallen
+  from ~5300 to ~2100 types (VMS 6846), TTR from 0.18 to 0.07 (VMS 0.23),
+  word entropy from 10.2 to 8.0 bits (VMS 10.3), conditional glyph entropy
+  h2 from 2.12 to 1.84 (VMS 2.14), and the Zipf slope steepens past the
+  VMS. A single table leaves 400 types. The multiple tables *are* the
+  mechanism behind Naibbe's vocabulary-size, Zipf, hapax and h2 results, so
+  "deterministic table choice" in the sense of fewer live tables trades
+  every one of them for the doubling rate.
+- **A repeat-conditional reuse rule costs nothing.** Reusing the previous
+  token only when the respaced unit repeats (Boxer's `doubling_strength`
+  transplanted to Naibbe) hits the VMS at s ≈ 0.55 (Latin), 0.85 (Italian),
+  0.4 (German) while every other metric is unchanged to two decimals,
+  because it touches only the ~1 % of pairs that are unit repeats. This is
+  the s ≈ 0.2–0.35 "scribe reuses on a doubled letter" reading of §4, and
+  it is the right knob for CH.7 if the rung-3 corpus should match the
+  doubling rate.
+- Two pre-existing gaps that are *not* about doubling, visible in the same
+  table: Naibbe's hapax share (0.38–0.48 of types) is well below the VMS's
+  0.70 at equal token count, and its type count is ~20 % low. Both say
+  Naibbe re-uses its vocabulary more than the manuscript does — the
+  opposite direction from the doubling gap, and not fixable by the deck.
+
 ## 6. Consequences for the project
 
 - **Rung 4 (CH.8):** a cheap, well-motivated variant — extend the arithmetic
@@ -185,6 +284,11 @@ differ in the plaintext alphabet (≈25 vs ≈31–33 symbols).
 - The collapse analysis uses normalized modern editions. Medieval spelling wrote
   fewer geminates than these corpora do, which lowers the plaintext rate and
   therefore lowers the required n — the numbers here are upper bounds on n.
+- Naibbe under-doubles by 3–6× (§5b). If the rung-3 generator should match
+  the VMS doubling rate, use the repeat-conditional reuse rule of §5c
+  (s ≈ 0.4–0.85 by language), *not* deck concentration, which destroys the
+  vocabulary/Zipf/h2 matches. A CH.7 decision; it changes the synthetic
+  corpus, not the head.
 - Not yet measured: the repeat-at-distance profile (lags 2–10) per hand, which
   would show whether the excess is strictly adjacent (a doubling mechanism) or
   whether scribes also favour recently-used homophones ("sticky" reuse) — the

@@ -72,3 +72,16 @@ def test_per_window_crn_deterministic():
     a = per_window_nelbo_bits(model, ids, 0, n_strata=8, seed=9)
     b = per_window_nelbo_bits(model, ids, 0, n_strata=8, seed=9)
     assert torch.equal(a, b)
+
+
+def test_per_position_mean_matches_per_window():
+    """Per-position contributions (task 2.5 NULL/letter split) average to the
+    per-window estimate under the same seed (identical masking draws)."""
+    from diff_voyn.infra.nelbo import per_position_nelbo_bits, per_window_nelbo_bits
+
+    ids = torch.randint(6, 31, (3, 96))
+    model = LangSensitiveModel()
+    per_pos = per_position_nelbo_bits(model, ids, 1, n_strata=8, seed=5)
+    per_win = per_window_nelbo_bits(model, ids, 1, n_strata=8, seed=5)
+    assert per_pos.shape == (3, 96)
+    assert torch.allclose(per_pos.mean(-1), per_win, atol=1e-5)
