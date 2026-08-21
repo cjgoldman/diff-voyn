@@ -64,8 +64,13 @@ class Rotary(nn.Module):
 
 
 class Attention(nn.Module):
-    def __init__(self, cfg: ModelConfig):
+    """``causal=False`` (the backbone) is bidirectional by design; the causal
+    variant exists only for the §5b.3 char-AR *reference* model
+    (:mod:`diff_voyn.model.ar_reference`), never for the instrument."""
+
+    def __init__(self, cfg: ModelConfig, causal: bool = False):
         super().__init__()
+        self.causal = causal
         self.n_heads = cfg.n_heads
         self.head_dim = cfg.d_model // cfg.n_heads
         self.qkv = nn.Linear(cfg.d_model, 3 * cfg.d_model, bias=False)
@@ -82,7 +87,11 @@ class Attention(nn.Module):
         q, k = rotary.rotate(q), rotary.rotate(k)
         # Bidirectional (no causal mask) — the model is an encoder by design.
         y = F.scaled_dot_product_attention(
-            q, k, v, dropout_p=self.attn_dropout_p if self.training else 0.0
+            q,
+            k,
+            v,
+            dropout_p=self.attn_dropout_p if self.training else 0.0,
+            is_causal=self.causal,
         )
         y = y.transpose(1, 2).reshape(b, l, d)
         return self.dropout(self.out(y))
@@ -101,10 +110,10 @@ class SwiGLU(nn.Module):
 
 
 class Block(nn.Module):
-    def __init__(self, cfg: ModelConfig):
+    def __init__(self, cfg: ModelConfig, causal: bool = False):
         super().__init__()
         self.attn_norm = RMSNorm(cfg.d_model)
-        self.attn = Attention(cfg)
+        self.attn = Attention(cfg, causal=causal)
         self.ffn_norm = RMSNorm(cfg.d_model)
         self.ffn = SwiGLU(cfg)
 

@@ -3,11 +3,12 @@
 Checks, in order:
 
 1. **Plateau (task 1.4):** per-language held-out canary from the Phase-A run
-   logs — relative improvement over the trailing 1000 steps, criterion <0.5%.
-   Because the canary is defined on EMA weights (decay 0.9999 ⇒ ~10k-step lag),
-   the final checkpoints are also scored with raw vs EMA weights: a large
-   raw-vs-EMA gap means residual canary slope is EMA catch-up, not model
-   improvement.
+   logs — relative improvement over the trailing 1000 steps, criterion <0.5%,
+   judged on the EMA canary (hard check) and, where the log carries it, on the
+   raw-weight canary too (the post-20k tail logs both). The final checkpoints
+   are also scored raw vs EMA: a large raw-vs-EMA gap means residual canary
+   slope is EMA catch-up, not model improvement (the 2026-08-20 finding that
+   motivated the EMA-reset tail, see docs/phase1_status.md).
 2. **Interference (task 1.5):** no language stagnating while others improve —
    trailing-half improvement reported per language; any language below half
    the median improvement of the others is flagged.
@@ -15,11 +16,12 @@ Checks, in order:
    clean held-out windows by per-window conditional NELBO under common random
    numbers; top-1 agreement rate between the two models is reported, along
    with each model's top-1-equals-true-language rate.
-4. **Calibration table v1 (task 3.4, G1 checklist):** per-language held-out
-   NELBO alongside the v1 n-gram AR reference NLL, written to
-   ``DATA_ROOT/calibration/calibration_v1.json``. The n-gram is a *provisional*
-   AR reference — the design-§5b.3 small char-AR transformer offsets are an
-   upgrade item (needs GPU); offsets are recorded but flagged provisional.
+4. **Calibration table v1 (task 3.4, G1 checklist):** reads
+   ``DATA_ROOT/calibration/calibration_v1.json`` as produced by
+   ``scripts/calibrate.py`` (char-AR transformer reference, design §5b.3) and
+   checks it matches the scored checkpoint. If it is missing, a *provisional*
+   n-gram table is written to ``calibration_ngram_provisional.json`` and the
+   check is a WARN — the gate item is not met until the AR version exists.
 
 Run: ``uv run python scripts/g1_check.py [--no-clearml] [--device cpu]``
 """
@@ -48,6 +50,7 @@ from diff_voyn.model.backbone import Backbone
 RUNS = {"85m": "phase_a-85m-seed0", "25m": "phase_a-25m-seed0"}
 LOGS = {"85m": "phase_a-85m.log", "25m": "phase_a-25m.log"}
 EVAL_RE = re.compile(r"step\s+(\d+)\s+heldout NELBO \(EMA, cond\|uncond\): (.*)$")
+RAW_RE = re.compile(r"step\s+(\d+)\s+heldout NELBO \(raw, cond\|uncond\): (.*)$")
 LANG_RE = re.compile(r"(\w+) ([\d.]+)\|([\d.]+)u")
 
 PLATEAU_WINDOW_STEPS = 1000
@@ -64,16 +67,33 @@ def check(name: str, ok: bool, detail: str = "", warn_only: bool = False) -> Non
         (WARNINGS if warn_only else FAILURES).append(name)
 
 
-def parse_canary(log_path: Path) -> dict[int, dict[str, tuple[float, float]]]:
-    """step -> {lang: (cond_bits, uncond_bits)}."""
-    series: dict[int, dict[str, tuple[float, float]]] = {}
+Series = dict[int, dict[str, tuple[float, float]]]
+
+
+def parse_canary(log_path: Path) -> tuple[Series, Series]:
+    """(ema, raw): step -> {lang: (cond_bits, uncond_bits)}. A resumed run
+    appends to the same log, so later lines for a step win."""
+    ema: Series = {}
+    raw: Series = {}
     for line in log_path.read_text().splitlines():
-        m = EVAL_RE.search(line)
-        if m:
-            series[int(m.group(1))] = {
-                lang: (float(c), float(u)) for lang, c, u in LANG_RE.findall(m.group(2))
-            }
-    return series
+        for regex, out in ((EVAL_RE, ema), (RAW_RE, raw)):
+            m = regex.search(line)
+            if m:
+                out[int(m.group(1))] = {
+                    lang: (float(c), float(u))
+                    for lang, c, u in LANG_RE.findall(m.group(2))
+                }
+    return ema, raw
+
+
+def trailing_rel(
+    series: Series, lang: str, window: int
+) -> tuple[int, int, float, float, float]:
+    steps = sorted(series)
+    last = steps[-1]
+    ref = max(s for s in steps if s <= last - window)
+    v0, v1 = series[ref][lang][0], series[last][lang][0]
+    return ref, last, v0, v1, (v0 - v1) / v0
 
 
 def load_models(ckpt_path: Path, device: str) -> tuple[Backbone, Backbone, int]:
@@ -108,26 +128,34 @@ def main() -> None:
     )
     canary: dict[str, dict] = {}
     for size, log_name in LOGS.items():
-        series = parse_canary(root / "runs" / log_name)
-        steps = sorted(series)
-        last = steps[-1]
-        ref = max(s for s in steps if s <= last - PLATEAU_WINDOW_STEPS)
-        canary[size] = {"final_step": last, "series": series}
+        series, raw_series = parse_canary(root / "runs" / log_name)
+        canary[size] = {"final_step": max(series), "series": series, "raw": raw_series}
         for lang in LANG_TO_INDEX:
-            v0, v1 = series[ref][lang][0], series[last][lang][0]
-            rel = (v0 - v1) / v0
+            ref, last, v0, v1, rel = trailing_rel(series, lang, PLATEAU_WINDOW_STEPS)
             check(
-                f"{size} {lang}: {v0:.3f}→{v1:.3f} over steps {ref}→{last} "
+                f"{size} {lang} EMA: {v0:.3f}→{v1:.3f} over steps {ref}→{last} "
                 f"({rel:+.2%})",
                 rel < PLATEAU_THRESHOLD,
-                warn_only=True,  # verdict refined by the EMA-lag check below
             )
-            report.setdefault("plateau", {})[f"{size}/{lang}"] = {
-                "ref_step": ref,
-                "ref": v0,
-                "final": v1,
-                "trailing_rel": rel,
-            }
+            entry = {"ref_step": ref, "ref": v0, "final": v1, "trailing_rel": rel}
+            raw_steps = sorted(raw_series)
+            if raw_steps and raw_steps[-1] - raw_steps[0] >= PLATEAU_WINDOW_STEPS:
+                rref, rlast, r0, r1, rrel = trailing_rel(
+                    raw_series, lang, PLATEAU_WINDOW_STEPS
+                )
+                check(
+                    f"{size} {lang} raw: {r0:.3f}→{r1:.3f} over steps {rref}→{rlast} "
+                    f"({rrel:+.2%})",
+                    rrel < PLATEAU_THRESHOLD,
+                    warn_only=True,
+                )
+                entry["raw"] = {
+                    "ref_step": rref,
+                    "ref": r0,
+                    "final": r1,
+                    "trailing_rel": rrel,
+                }
+            report.setdefault("plateau", {})[f"{size}/{lang}"] = entry
 
     # Raw-vs-EMA gap on the final checkpoints (EMA-lag diagnosis).
     print(
@@ -244,7 +272,36 @@ def main() -> None:
     report["ranking_probe"]["true_lang_idx"] = true.tolist()
 
     # ------------------------------------------------------------------ G1.4
-    print("G1.4 calibration table v1 (provisional n-gram AR reference)")
+    print("G1.4 calibration table v1 (task 3.4)")
+    cal_dir = root / "calibration"
+    cal_dir.mkdir(exist_ok=True)
+    cal_v1 = cal_dir / "calibration_v1.json"
+    ar_cal = json.loads(cal_v1.read_text()) if cal_v1.exists() else None
+    if ar_cal is not None and "ar_reference" in ar_cal:
+        same_ckpt = (
+            ar_cal["backbone"]["step"] == report["raw_vs_ema"]["85m/latin"]["step"]
+        )
+        for lang, t in ar_cal["languages"].items():
+            print(
+                f"  {lang}: NELBO {t['nelbo_bits']:.4f}  NLL_AR {t['nll_ar_bits']:.4f}  "
+                f"offset {t['offset_bits']:+.4f}±{t['offset_sem']:.4f} "
+                f"(n={t['n_windows']} windows)"
+            )
+        check(
+            f"calibration v1 (char-AR reference) present, backbone step "
+            f"{ar_cal['backbone']['step']}; offset spread "
+            f"{ar_cal['offset_spread_bits']:.4f} bits/char",
+            same_ckpt,
+            "" if same_ckpt else "calibration was computed on a different checkpoint",
+        )
+        report["calibration_v1"] = ar_cal
+    else:
+        check(
+            "calibration v1 from task 3.4 (char-AR reference) — not found; "
+            "run scripts/train_ar_reference.py then scripts/calibrate.py",
+            False,
+            warn_only=True,
+        )
     ngram = json.loads((root / "ngram_lms" / "v1" / "summary.json").read_text())
     table = {}
     for lang in LANG_TO_INDEX:
@@ -259,10 +316,8 @@ def main() -> None:
             f"  {lang}: NELBO {nelbo:.3f}  ngram5 NLL {nll_ar:.3f}  "
             f"offset {nelbo - nll_ar:+.3f} (provisional)"
         )
-    cal_dir = root / "calibration"
-    cal_dir.mkdir(exist_ok=True)
     cal = {
-        "calibration_version": "v1",
+        "calibration_version": "ngram-provisional",
         "created_utc": report["created_utc"],
         "phase": "phase_a",
         "checkpoint": str(root / "runs" / RUNS["85m"] / "ckpt_final.pt"),
@@ -273,9 +328,11 @@ def main() -> None:
         "replaces it.",
         "languages": table,
     }
-    (cal_dir / "calibration_v1.json").write_text(json.dumps(cal, indent=2))
-    print(f"  written: {cal_dir / 'calibration_v1.json'}")
-    report["calibration_v1"] = cal
+    (cal_dir / "calibration_ngram_provisional.json").write_text(
+        json.dumps(cal, indent=2)
+    )
+    print(f"  written: {cal_dir / 'calibration_ngram_provisional.json'}")
+    report["calibration_ngram_provisional"] = cal
 
     (root / "runs" / "g1_report.json").write_text(json.dumps(report, indent=2))
     print(f"report: {root / 'runs' / 'g1_report.json'}")

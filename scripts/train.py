@@ -16,6 +16,15 @@ Usage:
     uv run python scripts/train.py --phase pilot   --model 25m   # task 1.3
     uv run python scripts/train.py --phase phase_a --model 85m   # task 1.4
     ... --resume        # continue from <run_dir>/ckpt_last.pt
+    ... --resume --steps 23000 --schedule-total 20000 --ema-reset --ema-decay 0.999
+                        # post-G1 EMA tail: hold the LR floor, restart the EMA
+                        # from the raw weights with a decay matched to the tail
+
+The canary is logged from the EMA weights *and* from the raw weights: with
+decay 0.9999 the EMA lags the model by ~10k steps, so a raw-vs-EMA gap on the
+dashboard is what distinguishes genuine improvement from EMA catch-up (the G1
+judgement call of 2026-08-20). On ``--resume`` the data stream is re-seeded
+from the resume step so an extension never replays the first windows.
 
 Checkpoints and manifests land under DATA_ROOT/runs/<run_name>/.
 """
@@ -88,6 +97,13 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--model", choices=["25m", "85m"], default="25m")
     p.add_argument("--phase", choices=list(PHASE_DEFAULTS), default="pilot")
     p.add_argument("--steps", type=int, default=None, help="optimizer steps")
+    p.add_argument(
+        "--schedule-total",
+        type=int,
+        default=None,
+        help="cosine horizon (default: --steps); with --steps beyond it the LR "
+        "holds at the floor — use when extending a finished run",
+    )
     p.add_argument("--micro-batch", type=int, default=32, help="sequences per fwd")
     p.add_argument("--accum", type=int, default=None)
     p.add_argument("--warmup", type=int, default=None)
@@ -100,12 +116,33 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--run-name", default=None)
     p.add_argument("--resume", action="store_true")
+    p.add_argument(
+        "--ema-reset",
+        action="store_true",
+        help="on --resume, restart the EMA shadow from the raw weights",
+    )
+    p.add_argument(
+        "--ema-decay",
+        type=float,
+        default=None,
+        help="override the EMA decay (default: config 0.9999); with --resume the "
+        "new decay applies from the resume step",
+    )
+    p.add_argument(
+        "--no-eval-raw",
+        action="store_true",
+        help="skip the raw-weight canary (EMA-only, as in the original Phase A)",
+    )
     p.add_argument("--no-clearml", action="store_true")
     p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = p.parse_args()
     for key, val in PHASE_DEFAULTS[args.phase].items():
         if getattr(args, key) is None:
             setattr(args, key, val)
+    if args.schedule_total is None:
+        args.schedule_total = args.steps
+    if args.ema_reset and not args.resume:
+        p.error("--ema-reset only makes sense with --resume")
     if args.run_name is None:
         args.run_name = f"{args.phase}-{args.model}-seed{args.seed}"
     return args
@@ -124,13 +161,24 @@ def cosine_with_warmup(warmup: int, total: int, floor: float = 0.1):
 @torch.no_grad()
 def canary_eval(
     eval_model: Backbone,
-    ema: EMA,
+    ema: EMA | None,
     heldout_ids: dict[str, torch.Tensor],
     n_strata: int,
     device: str,
+    *,
+    raw_model: Backbone | None = None,
 ) -> tuple[dict[str, float], dict[str, float]]:
-    """Per-language held-out NELBO (EMA weights, CRN across languages)."""
-    ema.copy_to(eval_model)
+    """Per-language held-out NELBO, CRN across languages.
+
+    Scores the EMA weights (``ema``) — or, with ``raw_model`` given and
+    ``ema=None``, the current raw weights copied into ``eval_model`` so
+    dropout stays off and the training module is untouched.
+    """
+    if ema is not None:
+        ema.copy_to(eval_model)
+    else:
+        assert raw_model is not None
+        eval_model.load_state_dict(raw_model.state_dict())
     eval_model.eval()
     cond, uncond = {}, {}
     for lang, ids in heldout_ids.items():
@@ -164,6 +212,7 @@ def main() -> None:
             lr=args.lr,
             warmup_steps=args.warmup,
             batch_chars=args.micro_batch * args.accum * model_cfg.seq_len,
+            **({"ema_decay": args.ema_decay} if args.ema_decay is not None else {}),
         ),
     )
     run_dir = root / "runs" / cfg.run_name
@@ -181,19 +230,6 @@ def main() -> None:
         for lang, sp in splits["languages"].items()
     }
     windows = CorpusWindows(corpus_dir, train_ids)
-    dataset = DiffVoynIterableDataset(
-        windows,
-        seq_len=model_cfg.seq_len,
-        temperature=cfg.data.sampling_temperature,
-        seed=args.seed,
-    )
-    loader = torch.utils.data.DataLoader(
-        dataset,
-        batch_size=args.micro_batch,
-        num_workers=2,
-        persistent_workers=True,
-        pin_memory=(device == "cuda"),
-    )
     weights = LanguageSampler(
         windows.chars, cfg.data.sampling_temperature
     ).weights_dict()
@@ -225,7 +261,7 @@ def main() -> None:
         weight_decay=cfg.optim.weight_decay,
     )
     sched = torch.optim.lr_scheduler.LambdaLR(
-        opt, cosine_with_warmup(args.warmup, args.steps)
+        opt, cosine_with_warmup(args.warmup, args.schedule_total)
     )
     print(f"{args.model} backbone: {model.n_params()/1e6:.1f}M params on {device}")
 
@@ -237,8 +273,43 @@ def main() -> None:
         )
         start_step = state["step"]
         print(f"resumed from {ckpt_path} at step {start_step}")
+        if args.ema_decay is not None:
+            ema.decay = args.ema_decay
+        if args.ema_reset:
+            ema = EMA(model, ema.decay)
+        print(
+            f"  ema decay {ema.decay}"
+            + ("  (shadow reset to raw weights)" if args.ema_reset else "")
+            + f"  lr {sched.get_last_lr()[0]:.2e}"
+        )
+    schedule_info = {
+        "steps": args.steps,
+        "schedule_total": args.schedule_total,
+        "ema_decay": ema.decay,
+        "ema_reset_at": start_step if args.ema_reset else None,
+        "resumed_from_step": start_step if args.resume else None,
+    }
+
+    # Data stream: re-seeded from the resume step so an extension draws fresh
+    # windows instead of replaying the stream from step 0.
+    data_seed = args.seed + start_step
+    dataset = DiffVoynIterableDataset(
+        windows,
+        seq_len=model_cfg.seq_len,
+        temperature=cfg.data.sampling_temperature,
+        seed=data_seed,
+    )
+    loader = torch.utils.data.DataLoader(
+        dataset,
+        batch_size=args.micro_batch,
+        num_workers=2,
+        persistent_workers=True,
+        pin_memory=(device == "cuda"),
+    )
 
     manifest = build_run_manifest(cfg, root, language_weights=weights)
+    manifest["schedule"] = schedule_info
+    manifest["data_seed"] = data_seed
     write_run_manifest(manifest, run_dir)
 
     task = None
@@ -252,8 +323,10 @@ def main() -> None:
         task = init_task(
             cfg,
             root,
-            tags=[args.model, "task1.3" if args.phase == "pilot" else "task1.4"],
+            tags=[args.model, "task1.3" if args.phase == "pilot" else "task1.4"]
+            + (["resume"] if args.resume else []),
         )
+        task.connect_configuration(schedule_info, name="schedule")
         report_language_weights(task, weights)
         logger = task.get_logger()
 
@@ -286,7 +359,7 @@ def main() -> None:
                 scheduler=sched,
                 ema=ema,
                 step=step,
-                extra={"config": asdict(cfg)},
+                extra={"config": asdict(cfg), "schedule": schedule_info},
             )
             raise RuntimeError(
                 f"non-finite loss at step {step} (see ckpt_nonfinite.pt)"
@@ -349,6 +422,34 @@ def main() -> None:
                     logger.report_scalar(
                         "heldout_nelbo_bits_per_char_unconditional", lang, bits, step
                     )
+            if not args.no_eval_raw:
+                rcond, runcond = canary_eval(
+                    eval_model,
+                    None,
+                    heldout_batch,
+                    args.eval_strata,
+                    device,
+                    raw_model=model,
+                )
+                model.train()
+                msg = "  ".join(
+                    f"{lang} {rcond[lang]:.3f}|{runcond[lang]:.3f}u" for lang in rcond
+                )
+                print(
+                    f"step {step:6d}  heldout NELBO (raw, cond|uncond): {msg}",
+                    flush=True,
+                )
+                if task:
+                    for lang in rcond:
+                        logger.report_scalar(
+                            "heldout_nelbo_bits_per_char_raw", lang, rcond[lang], step
+                        )
+                        logger.report_scalar(
+                            "heldout_nelbo_bits_per_char_raw_unconditional",
+                            lang,
+                            runcond[lang],
+                            step,
+                        )
             t_last = time.time()
 
         if step % args.ckpt_every == 0 or step == args.steps:
@@ -359,7 +460,7 @@ def main() -> None:
                 scheduler=sched,
                 ema=ema,
                 step=step,
-                extra={"config": asdict(cfg)},
+                extra={"config": asdict(cfg), "schedule": schedule_info},
             )
 
         if step >= args.steps:
@@ -372,7 +473,7 @@ def main() -> None:
         scheduler=sched,
         ema=ema,
         step=step,
-        extra={"config": asdict(cfg)},
+        extra={"config": asdict(cfg), "schedule": schedule_info},
     )
     print(f"done at step {step}; checkpoints in {run_dir}")
     if task:

@@ -72,5 +72,10 @@ def load_checkpoint(
         np.random.set_state(rng["numpy"])
         torch.set_rng_state(rng["torch_cpu"])
         if rng["torch_cuda"] is not None and torch.cuda.is_available():
-            torch.cuda.set_rng_state_all(rng["torch_cuda"])
+            # A checkpoint may have been saved with more GPUs visible than now
+            # (e.g. resumed under CUDA_VISIBLE_DEVICES pinning) — restore what
+            # exists; spare states are irrelevant to the visible devices.
+            n = min(len(rng["torch_cuda"]), torch.cuda.device_count())
+            for i in range(n):
+                torch.cuda.set_rng_state(rng["torch_cuda"][i], i)
     return state
