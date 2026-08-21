@@ -110,9 +110,14 @@ class EvaluatorBase:
     def calibrated_bits_per_char(
         self, raw_score_nats: torch.Tensor | float, n_chars: float, language: str
     ) -> float:
+        """Raw log-likelihood-scale score → calibrated bits/char. The
+        arithmetic lives in :func:`diff_voyn.metrology.calibration.
+        calibrate_bits` (task 3.4 "applied in exactly one place")."""
+        from ..metrology.calibration import calibrate_bits
+
         raw = float(raw_score_nats)
         bits = -raw / (n_chars * float(np.log(2.0)))
-        return bits + self.calibration_offsets_bits.get(language, 0.0)
+        return calibrate_bits(bits, language, self.calibration_offsets_bits)
 
 
 class NgramEvaluator(EvaluatorBase):

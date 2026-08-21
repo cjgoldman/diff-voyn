@@ -39,7 +39,20 @@ class DiffusionEvaluator(EvaluatorBase):
         t_floor: float = 1e-3,
         device: str | torch.device = "cpu",
         calibration_offsets_bits: dict[str, float] | None = None,
+        calibration_version: str | None = None,
     ):
+        """``calibration_version`` loads the versioned §3.4 table
+        (``metrology.CalibrationTable``) and installs its offsets in the
+        hook's additive convention; ``calibration_offsets_bits`` passes
+        additive offsets directly (mutually exclusive)."""
+        if calibration_version is not None:
+            if calibration_offsets_bits is not None:
+                raise ValueError("give calibration_version or offsets, not both")
+            from ..metrology.calibration import CalibrationTable
+
+            calibration_offsets_bits = CalibrationTable.load(
+                calibration_version
+            ).additive_offsets()
         self.backbone = backbone.to(device).eval()
         for p in self.backbone.parameters():  # frozen measuring stick (§7.4)
             p.requires_grad_(False)

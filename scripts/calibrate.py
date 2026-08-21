@@ -14,12 +14,20 @@ For every frozen language, on the *same* text (the full tiled held-out split,
 estimate. It is stored here, versioned, and applied in exactly one place
 (``EvaluatorBase.calibrated_bits_per_char`` — task 3.4 "single-sourced").
 
+Reference tiers: ``--ar-dir`` may hold per-language models
+(``<dir>/<lang>/ar_best.pt``, v1/v2) or ONE multilingual language-conditioned
+model (``<dir>/multilingual/ar_best.pt``, v3 — scored under each language's
+own condition). The multilingual tier removes the per-language data-starvation
+confound of the monolingual references (see ``docs/phase3_status.md``).
+
 Usage:
     uv run python scripts/calibrate.py [--ckpt DATA_ROOT/runs/phase_a-85m-seed0/ckpt_final.pt]
                                        [--ar-which best|final] [--strata 32] [--version v1]
+    uv run python scripts/calibrate.py --ckpt .../phase_b-85m-seed0/ckpt_final.pt \
+        --ar-dir DATA_ROOT/ar_reference/v3 --phase phase_b --version v3
 
 Writes DATA_ROOT/calibration/calibration_<version>.json and the per-window
-arrays in calibration_<version>_windows.npz.
+arrays (+ window→document index) in calibration_<version>_windows.npz.
 """
 
 from __future__ import annotations
@@ -37,9 +45,13 @@ import torch
 
 from diff_voyn.ciphers.external import data_root
 from diff_voyn.corpus.splits import load_splits
-from diff_voyn.data.loader import LANG_TO_INDEX, NULL_LANG_INDEX, CorpusWindows
+from diff_voyn.data.loader import LANG_TO_INDEX, CorpusWindows
 from diff_voyn.infra.config import ModelConfig
-from diff_voyn.infra.nelbo import per_window_nelbo_bits
+from diff_voyn.metrology.scoring import (
+    DEFAULT_CONDITIONS,
+    ScoreSettings,
+    score_conditions,
+)
 from diff_voyn.model.ar_reference import ARConfig, CharARLM
 from diff_voyn.model.backbone import Backbone
 
@@ -71,7 +83,6 @@ def load_ar(path: Path, device: str) -> tuple[CharARLM, dict]:
     return model, {k: v for k, v in state.items() if k != "model"}
 
 
-@torch.no_grad()
 def score_diffusion(
     model: Backbone,
     ids: torch.Tensor,
@@ -82,36 +93,62 @@ def score_diffusion(
     device: str,
 ) -> np.ndarray:
     """[n_windows, n_lang + 1] bits/char: columns = frozen language order,
-    then unconditional. CRN: every condition of a chunk shares one seed;
-    chunks get distinct seeds so mask noise is independent across windows."""
-    conds = list(LANG_TO_INDEX.values()) + [NULL_LANG_INDEX]
-    out = np.zeros((len(ids), len(conds)), dtype=np.float64)
-    for ci, i in enumerate(range(0, len(ids), batch)):
-        chunk = ids[i : i + batch]
-        for j, lang_idx in enumerate(conds):
-            with torch.autocast("cuda", dtype=torch.bfloat16, enabled=device == "cuda"):
-                out[i : i + len(chunk), j] = per_window_nelbo_bits(
-                    model,
-                    chunk,
-                    lang_idx,
-                    n_strata=strata,
-                    seed=seed + ci,
-                    device=device,
-                ).numpy()
-    return out
+    then unconditional. CRN: every condition of a chunk shares one seed
+    (``metrology.score_conditions``; chunk ``i`` uses ``seed + i`` exactly as
+    the v1 table did, so tables are paired window-for-window)."""
+    return score_conditions(
+        model,
+        ids,
+        DEFAULT_CONDITIONS,
+        settings=ScoreSettings(n_strata=strata, seed=seed, batch=batch),
+        device=device,
+    )
 
 
 @torch.no_grad()
 def score_ar(
-    model: CharARLM, ids: torch.Tensor, *, batch: int, device: str
+    model: CharARLM,
+    ids: torch.Tensor,
+    *,
+    batch: int,
+    device: str,
+    lang_idx: int | None = None,
 ) -> np.ndarray:
     out = []
     for i in range(0, len(ids), batch):
+        chunk = ids[i : i + batch].to(device)
+        lang = (
+            None
+            if lang_idx is None
+            else torch.full((len(chunk),), lang_idx, dtype=torch.long, device=device)
+        )
         with torch.autocast("cuda", dtype=torch.bfloat16, enabled=device == "cuda"):
-            out.append(
-                model.nll_bits_per_char(ids[i : i + batch].to(device)).cpu().numpy()
-            )
+            out.append(model.nll_bits_per_char(chunk, lang).cpu().numpy())
     return np.concatenate(out).astype(np.float64)
+
+
+def load_reference(ar_dir: Path, which: str, device: str):
+    """Returns ``(get_model(lang) -> (model, meta), tier_description)``."""
+    ml = ar_dir / "multilingual" / f"ar_{which}.pt"
+    if ml.exists():
+        model, meta = load_ar(ml, device)
+        if not model.cfg.multilingual:
+            raise ValueError(f"{ml} is not a multilingual reference")
+        return (lambda lang: (model, meta)), (
+            "multilingual language-conditioned char-AR (one model, backbone's "
+            f"τ-balanced mix, design §5b.3), {ar_dir.name}/'{which}' checkpoint"
+        )
+    cache = {}
+
+    def get(lang):
+        if lang not in cache:
+            cache[lang] = load_ar(ar_dir / lang / f"ar_{which}.pt", device)
+        return cache[lang]
+
+    return get, (
+        "char-AR transformer per language (design §5b.3), "
+        f"scripts/train_ar_reference.py, {ar_dir.name}/'{which}' checkpoints"
+    )
 
 
 def main() -> None:
@@ -134,9 +171,30 @@ def main() -> None:
         help="debug cap on windows per language (recorded in the output; the "
         "real table must be produced uncapped)",
     )
+    p.add_argument(
+        "--derive-report-only",
+        metavar="SOURCE_VERSION",
+        default=None,
+        help="write --version as a copy of SOURCE_VERSION under the report-only "
+        "policy (applied offsets zero, measured offsets kept); no scoring",
+    )
+    p.add_argument(
+        "--nelbo-from",
+        metavar="VERSION",
+        default=None,
+        help="reuse the per-window diffusion NELBO arrays of an existing table "
+        "(same backbone, windows, seeds, strata) and score only the AR reference "
+        "— a reference swap without GPU work; the backbone metadata is copied",
+    )
     p.add_argument("--no-clearml", action="store_true")
     p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = p.parse_args()
+    if args.derive_report_only:
+        from diff_voyn.metrology.calibration import derive_report_only
+
+        out = derive_report_only(args.derive_report_only, args.version, root)
+        print(f"written {out} (report-only policy, derived from {args.derive_report_only})")
+        return
     if args.device == "cuda":
         torch.set_float32_matmul_precision("high")
 
@@ -149,28 +207,60 @@ def main() -> None:
             for lang, sp in splits["languages"].items()
         },
     )
-    backbone, bb_meta = load_ema_backbone(args.ckpt, args.device)
+    reuse = None
+    if args.nelbo_from:
+        src = json.loads(
+            (root / "calibration" / f"calibration_{args.nelbo_from}.json").read_text()
+        )
+        reuse = np.load(root / "calibration" / f"calibration_{args.nelbo_from}_windows.npz")
+        bb_meta = src["backbone"]
+        args.ckpt = Path(bb_meta["path"])
+        args.strata, args.seed = src["scoring"]["strata"], src["scoring"]["seed"]
+        if src["scoring"].get("max_windows_cap"):
+            raise SystemExit("source table was capped; cannot reuse")
+        backbone = None
+        print(f"reusing diffusion NELBO arrays of calibration {args.nelbo_from}")
+    else:
+        backbone, bb_meta = load_ema_backbone(args.ckpt, args.device)
     seq_len = bb_meta["model"]["seq_len"]
     print(
         f"backbone {args.ckpt.name} step {bb_meta['step']} (EMA {bb_meta['ema_decay']})"
     )
 
+    get_reference, reference_desc = load_reference(
+        args.ar_dir, args.ar_which, args.device
+    )
     table, arrays, ar_meta = {}, {}, {}
     for lang, li in LANG_TO_INDEX.items():
-        ids = torch.from_numpy(heldout.tiled_windows(lang, seq_len).astype(np.int64))
+        tiled, doc_index = heldout.tiled_windows_by_doc(lang, seq_len)
+        ids = torch.from_numpy(tiled.astype(np.int64))
         if args.max_windows:
             ids = ids[: args.max_windows]
-        ar, meta = load_ar(args.ar_dir / lang / f"ar_{args.ar_which}.pt", args.device)
-        ar_meta[lang] = meta
-        nelbo = score_diffusion(
-            backbone,
+            doc_index = doc_index[: args.max_windows]
+        ar, meta = get_reference(lang)
+        ar_meta[lang] = dict(meta) | {"language": lang}
+        if isinstance(meta.get("heldout_bits_per_char"), dict):
+            ar_meta[lang]["heldout_bits_per_char"] = meta["heldout_bits_per_char"][lang]
+        if reuse is not None:
+            nelbo = reuse[f"{lang}/nelbo"]
+            if len(nelbo) != len(ids):
+                raise SystemExit(f"{lang}: {len(nelbo)} reused windows vs {len(ids)} tiled")
+        else:
+            nelbo = score_diffusion(
+                backbone,
+                ids,
+                strata=args.strata,
+                seed=args.seed,
+                batch=args.batch,
+                device=args.device,
+            )
+        nll_ar = score_ar(
+            ar,
             ids,
-            strata=args.strata,
-            seed=args.seed,
             batch=args.batch,
             device=args.device,
+            lang_idx=li if ar.cfg.multilingual else None,
         )
-        nll_ar = score_ar(ar, ids, batch=args.batch, device=args.device)
         own = nelbo[:, li]
         diff = own - nll_ar
         n = len(ids)
@@ -193,6 +283,8 @@ def main() -> None:
         }
         arrays[f"{lang}/nelbo"] = nelbo
         arrays[f"{lang}/nll_ar"] = nll_ar
+        arrays[f"{lang}/doc_index"] = doc_index
+        arrays[f"{lang}/doc_ids"] = np.array(heldout.doc_ids[lang])
         t = table[lang]
         print(
             f"  {lang:8s} n={n:4d}  NELBO {t['nelbo_bits']:.4f}±{t['nelbo_sem']:.4f}  "
@@ -209,13 +301,15 @@ def main() -> None:
         "calibration_version": args.version,
         "created_utc": datetime.now(UTC).isoformat(),
         "phase": args.phase,
-        "reference": "char-AR transformer per language (design §5b.3), "
-        f"scripts/train_ar_reference.py, '{args.ar_which}' checkpoints",
+        "reference": reference_desc,
+        "ar_dir": str(args.ar_dir),
         "definition": "offset_bits = NELBO(own-language condition, EMA backbone) − "
         "NLL_AR, bits/char, mean over the full tiled held-out split; apply as an "
         "additive correction NELBO_calibrated = NELBO − offset in exactly one place "
-        "(EvaluatorBase.calibrated_bits_per_char).",
+        "(diff_voyn.metrology.calibration.calibrate_bits, reached through "
+        "CalibrationTable.apply / EvaluatorBase.calibrated_bits_per_char).",
         "backbone": bb_meta,
+        "nelbo_reused_from": args.nelbo_from,
         "ar_reference": {
             lang: {k: v for k, v in m.items() if k != "config"}
             | {"config": m["config"]}
@@ -244,7 +338,7 @@ def main() -> None:
         task = init_task(
             RunConfig(run_name=f"calibration-{args.version}", phase="phase3"),
             root,
-            tags=["task3.4", "calibration"],
+            tags=["task3.4", "calibration", args.phase],
         )
         task.connect_configuration(cal, name="calibration")
         logger = task.get_logger()

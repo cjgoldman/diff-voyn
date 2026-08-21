@@ -76,6 +76,7 @@ def per_window_nelbo_bits(
     lang_idx: int,
     *,
     n_strata: int = 16,
+    samples_per_stratum: int = 1,
     seed: int = 0,
     device: str | torch.device = "cpu",
     t_floor: float = 1e-3,
@@ -87,6 +88,10 @@ def per_window_nelbo_bits(
     values and mask positions), but returns one value per window instead of
     the batch mean — the primitive behind per-document mean-and-spread
     scoring and the 25M/85M ranking-agreement probe (task 1.6).
+
+    ``n_strata × samples_per_stratum`` is the sample budget of design §5a
+    ("64 strata × k"); with ``samples_per_stratum=1`` the draw sequence is
+    identical to the original single-sample estimator for the same seed.
     """
     from ..vocab import MASK_ID
 
@@ -97,19 +102,21 @@ def per_window_nelbo_bits(
 
     total = torch.zeros(batch, dtype=torch.float64)
     for s in range(n_strata):
-        u = torch.rand(1, generator=g).item()
-        t = max((s + u) / n_strata, t_floor)
-        mask_draw = torch.rand(batch, seq_len, generator=g).to(device)
-        masked = mask_draw < t
-        if not masked.any():
-            continue
-        z_t = ids.masked_fill(masked, MASK_ID)
-        logp = F.log_softmax(model(z_t, lang).float(), dim=-1)
-        nll = -logp.gather(-1, ids.unsqueeze(-1)).squeeze(-1)
-        nll = nll.masked_fill(~masked, 0.0)
-        total += (nll.sum(dim=-1) / (t * seq_len)).double().cpu()
+        for _ in range(samples_per_stratum):
+            u = torch.rand(1, generator=g).item()
+            t = max((s + u) / n_strata, t_floor)
+            mask_draw = torch.rand(batch, seq_len, generator=g).to(device)
+            masked = mask_draw < t
+            if not masked.any():
+                continue
+            z_t = ids.masked_fill(masked, MASK_ID)
+            logp = F.log_softmax(model(z_t, lang).float(), dim=-1)
+            nll = -logp.gather(-1, ids.unsqueeze(-1)).squeeze(-1)
+            nll = nll.masked_fill(~masked, 0.0)
+            total += (nll.sum(dim=-1) / (t * seq_len)).double().cpu()
 
-    return (total / n_strata / math.log(2.0)).float()
+    n_draws = n_strata * samples_per_stratum
+    return (total / n_draws / math.log(2.0)).float()
 
 
 @torch.no_grad()

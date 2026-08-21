@@ -77,9 +77,11 @@ class CorpusWindows:
             if len(ch) == 1:
                 table[ord(ch)] = i
         self.docs: dict[str, list[np.ndarray]] = {}
+        self.doc_ids: dict[str, list[str]] = {}
         self.doc_weights: dict[str, np.ndarray] = {}
         self.chars: dict[str, int] = {}
         for lang, doc_ids in doc_ids_per_lang.items():
+            self.doc_ids[lang] = list(doc_ids)
             arrs = []
             for doc_id in doc_ids:
                 b = np.frombuffer(
@@ -116,14 +118,23 @@ class CorpusWindows:
         The evaluation counterpart of :meth:`sample_window`: calibration
         (task 3.4) scores the diffusion NELBO and the AR reference NLL on
         exactly these windows, so the two numbers share their text."""
-        chunks = []
-        for a in self.docs[lang]:
+        return self.tiled_windows_by_doc(lang, length)[0]
+
+    def tiled_windows_by_doc(
+        self, lang: str, length: int
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """:meth:`tiled_windows` plus the document index of every window
+        (``[n_windows]`` int64, indexing ``self.doc_ids[lang]``) — the key for
+        per-document mean-and-spread reporting (task 3.3)."""
+        chunks, doc_index = [], []
+        for di, a in enumerate(self.docs[lang]):
             n = len(a) // length
             if n:
                 chunks.append(a[: n * length].reshape(n, length))
+                doc_index.append(np.full(n, di, dtype=np.int64))
         if not chunks:
             raise ValueError(f"no {lang} document reaches {length} chars")
-        return np.concatenate(chunks, axis=0).copy()
+        return np.concatenate(chunks, axis=0).copy(), np.concatenate(doc_index)
 
 
 class MaskingSampler:
