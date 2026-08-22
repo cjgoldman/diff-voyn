@@ -61,8 +61,10 @@ def load_from_calibration(root: Path, version: str):
                 splits = load_splits(corpus_dir)
                 heldout = CorpusWindows(
                     corpus_dir,
-                    {l: [d["doc_id"] for d in sp["heldout"]]
-                     for l, sp in splits["languages"].items()},
+                    {
+                        l: [d["doc_id"] for d in sp["heldout"]]
+                        for l, sp in splits["languages"].items()
+                    },
                 )
             seq_len = cal["backbone"]["model"]["seq_len"]
             tiled, doc_index = heldout.tiled_windows_by_doc(lang, seq_len)

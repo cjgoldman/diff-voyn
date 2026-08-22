@@ -202,7 +202,12 @@ def test_report_only_policy(tmp_path):
         "backbone": {"path": "/x", "step": 7},
         "reference": "r",
         "languages": {
-            l: {"offset_bits": o, "offset_sem": 0.01, "nelbo_bits": 2.0, "nll_ar_bits": 2.0 - o}
+            l: {
+                "offset_bits": o,
+                "offset_sem": 0.01,
+                "nelbo_bits": 2.0,
+                "nll_ar_bits": 2.0 - o,
+            }
             for l, o in zip(LANGS, (0.1, -0.05, 0.2))
         },
     }
@@ -217,6 +222,8 @@ def test_report_only_policy(tmp_path):
     assert t.margin_uncertainty_bits("latin", "italian") == pytest.approx(0.15)
     src = CalibrationTable.load("vsrc", tmp_path)
     assert src.policy == "apply" and src.apply(2.5, "german") == pytest.approx(2.3)
-    assert src.margin_uncertainty_bits("latin", "italian") == pytest.approx(0.01 * 2**0.5)
+    assert src.margin_uncertainty_bits("latin", "italian") == pytest.approx(
+        0.01 * 2**0.5
+    )
     with pytest.raises(FileExistsError):
         derive_report_only("vsrc", "vnull", tmp_path)

@@ -155,7 +155,7 @@ def stage_solve(args, root: Path) -> None:
     jobs = build_suite(corpus_dir, splits, args.trials, args.lengths, args.seed)
     for j in jobs:
         j["restarts"] = args.restarts
-    out_path = root / "analysis" / "phase3" / f"{OUT}_solves.json"
+    out_path = args.solves
     done = {}
     if out_path.exists() and not args.fresh:
         for r in json.loads(out_path.read_text())["instances"]:
@@ -219,9 +219,7 @@ def stage_score(args, root: Path) -> None:
     ``sample_budget.py``)."""
     from diff_voyn.infra.checkpoint import load_backbone
 
-    solves = json.loads(
-        (root / "analysis" / "phase3" / f"{OUT}_solves.json").read_text()
-    )
+    solves = json.loads(args.solves.read_text())
     inst = solves["instances"]
     budget = args.budget
     if args.device == "cuda":
@@ -297,7 +295,8 @@ def stage_score(args, root: Path) -> None:
                 }
             )
         print(f"  scored {lang} L={L} n={len(rs)}  ({time.time()-t0:.0f}s)", flush=True)
-    out = root / "analysis" / "phase3" / f"{OUT}_scores.json"
+    out = args.out_dir / f"{OUT}_scores.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(
         json.dumps(
             {
@@ -348,7 +347,7 @@ def _rank_variants(root: Path, versions: list[str]) -> dict[str, dict[str, float
 
 
 def stage_report(args, root: Path) -> dict:
-    path = root / "analysis" / "phase3" / f"{OUT}_scores.json"
+    path = args.out_dir / f"{OUT}_scores.json"
     data = json.loads(path.read_text())
     inst = data["instances"]
     variants = _rank_variants(root, args.calibrations)
@@ -581,10 +580,10 @@ def stage_report(args, root: Path) -> dict:
             "pass": bool(long_acc[primary]["language"] >= 0.971),
         },
     }
-    out = root / "analysis" / "phase3" / f"{OUT}_report.json"
+    out = args.out_dir / f"{OUT}_report.json"
     out.write_text(json.dumps(report, indent=1))
     md = render_markdown(report)
-    (root / "analysis" / "phase3" / f"{OUT}_report.md").write_text(md)
+    (args.out_dir / f"{OUT}_report.md").write_text(md)
     print(md)
     print(f"written {out}")
     if not args.no_clearml:
@@ -592,7 +591,7 @@ def stage_report(args, root: Path) -> dict:
         from diff_voyn.infra.config import RunConfig
 
         task = init_task(
-            RunConfig(run_name="language-recovery", phase="phase3"),
+            RunConfig(run_name="language-recovery", phase=args.phase_tag),
             root,
             tags=["task3.6", "task3.7"],
         )
@@ -613,8 +612,10 @@ def stage_report(args, root: Path) -> dict:
 def render_markdown(rep: dict) -> str:
     prim = f"calibration_{rep['primary_calibration']}"
     lines = [
-        f"### Language recovery on 1:1 ciphers — primary ranking `{prim}` "
-        f"(policy {rep.get('primary_calibration_policy', 'apply')})",
+        (
+            f"### Language recovery on 1:1 ciphers — primary ranking `{prim}` "
+            f"(policy {rep.get('primary_calibration_policy', 'apply')})"
+        ),
         "",
         "| language | L | n | SER (true hyp.) | wrong hyp. decodes truth | lang acc | 95% CI | family acc | uncalibrated | n-gram excess | flip-rate | margin (bits, median) | unresolved at calib. precision | true−shuffled | wrong−shuffled |",
         "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
@@ -726,6 +727,22 @@ def main() -> None:
     p.add_argument("--batch", type=int, default=50)
     p.add_argument("--calibrations", nargs="+", default=["v1", "v2", "v3"])
     p.add_argument("--primary", default=CALIBRATION_VERSION)
+    p.add_argument(
+        "--solves",
+        type=Path,
+        default=root / "analysis" / "phase3" / f"{OUT}_solves.json",
+        help="the solve-stage artifact (rung-1 decipherments are backbone-"
+        "independent, so Phase 4 re-scores the Phase-3 solves)",
+    )
+    p.add_argument(
+        "--out-dir",
+        type=Path,
+        default=root / "analysis" / "phase3",
+        help="where the score/report stages write (Phase 4: analysis/phase4)",
+    )
+    p.add_argument(
+        "--phase-tag", default="phase3", help="ClearML phase tag of the report task"
+    )
     p.add_argument("--no-clearml", action="store_true")
     p.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = p.parse_args()

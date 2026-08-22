@@ -193,7 +193,9 @@ def main() -> None:
         from diff_voyn.metrology.calibration import derive_report_only
 
         out = derive_report_only(args.derive_report_only, args.version, root)
-        print(f"written {out} (report-only policy, derived from {args.derive_report_only})")
+        print(
+            f"written {out} (report-only policy, derived from {args.derive_report_only})"
+        )
         return
     if args.device == "cuda":
         torch.set_float32_matmul_precision("high")
@@ -212,7 +214,9 @@ def main() -> None:
         src = json.loads(
             (root / "calibration" / f"calibration_{args.nelbo_from}.json").read_text()
         )
-        reuse = np.load(root / "calibration" / f"calibration_{args.nelbo_from}_windows.npz")
+        reuse = np.load(
+            root / "calibration" / f"calibration_{args.nelbo_from}_windows.npz"
+        )
         bb_meta = src["backbone"]
         args.ckpt = Path(bb_meta["path"])
         args.strata, args.seed = src["scoring"]["strata"], src["scoring"]["seed"]
@@ -244,7 +248,9 @@ def main() -> None:
         if reuse is not None:
             nelbo = reuse[f"{lang}/nelbo"]
             if len(nelbo) != len(ids):
-                raise SystemExit(f"{lang}: {len(nelbo)} reused windows vs {len(ids)} tiled")
+                raise SystemExit(
+                    f"{lang}: {len(nelbo)} reused windows vs {len(ids)} tiled"
+                )
         else:
             nelbo = score_diffusion(
                 backbone,

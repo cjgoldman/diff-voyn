@@ -42,7 +42,7 @@ from pathlib import Path
 
 from ..data.loader import LANG_TO_INDEX
 
-CALIBRATION_VERSION = "v1"
+CALIBRATION_VERSION = "v3-phase_c-ro"
 
 # Task 3.7: language-family granularity. Latin and Italian are Italic/Romance
 # (the close pair, the expected dominant confusion); German is Germanic.
@@ -199,6 +199,8 @@ def derive_report_only(
     )
     out = CalibrationTable.file_for(new_version, root)
     if out.exists():
-        raise FileExistsError(f"{out} exists — tables are immutable; pick a new version")
+        raise FileExistsError(
+            f"{out} exists — tables are immutable; pick a new version"
+        )
     out.write_text(json.dumps(d, indent=2))
     return out

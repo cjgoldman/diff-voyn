@@ -51,10 +51,18 @@ LANGS = tuple(LANG_TO_INDEX)
 REPO = Path(__file__).resolve().parent.parent
 
 
+# Phase-1 tables were written before ``ar_dir`` was recorded (docs/phase1_status.md).
+LEGACY_AR_DIR = {"v1-arv1": "v1", "v1": "v2", "25m-arv2": "v2"}
+
+
 def load_table(root: Path, version: str):
     t = CalibrationTable.load(version, root)
     full = json.loads(Path(t.path).read_text())
-    npz_path = root / "calibration" / f"calibration_{version}_windows.npz"
+    if not full.get("ar_dir") and version in LEGACY_AR_DIR:
+        full["ar_dir"] = str(root / "ar_reference" / LEGACY_AR_DIR[version])
+    # a derived table (report-only copy) shares its source's per-window arrays
+    arrays_of = full.get("derived_from") or version
+    npz_path = root / "calibration" / f"calibration_{arrays_of}_windows.npz"
     npz = np.load(npz_path) if npz_path.exists() else None
     return t, full, npz
 
@@ -113,6 +121,19 @@ def main() -> None:
         default=["v1-arv1", "v1", "v2", "v3-phase_a", "v3", "v2-25m", "v3-25m"],
     )
     p.add_argument("--adopt", default="v3", help="table the audit recommends applying")
+    p.add_argument(
+        "--out-dir",
+        type=Path,
+        default=root / "analysis" / "phase3",
+        help="where fairness_audit.json is written (Phase 4: analysis/phase4)",
+    )
+    p.add_argument(
+        "--doc",
+        type=Path,
+        default=REPO / "docs" / "phase3_fairness_audit.md",
+        help="markdown page to write (Phase 4: docs/phase4_fairness_audit.md)",
+    )
+    p.add_argument("--phase-tag", default="phase3")
     p.add_argument("--no-clearml", action="store_true")
     args = p.parse_args()
 
@@ -149,6 +170,8 @@ def main() -> None:
             "nll_ar_bits": t.nll_ar_bits,
             "backbone_run": Path(t.backbone_path).parent.name,
             "ar_dir": full.get("ar_dir"),
+            "derived_from": full.get("derived_from"),
+            "policy": t.policy,
             "per_document_offsets": docs,
         }
         if all(docs.values()):
@@ -158,6 +181,8 @@ def main() -> None:
     # 1. reference dependence: same backbone, different reference tiers
     by_backbone: dict[str, list[str]] = {}
     for v, t in tables.items():
+        if t["derived_from"]:  # same measurement as its source — not a swap
+            continue
         by_backbone.setdefault(t["backbone_run"], []).append(v)
     ref_dep = {}
     for run, vs in by_backbone.items():
@@ -217,9 +242,21 @@ def main() -> None:
                 ),
                 "consequence": (
                     (
-                        "a language-level offset exists beyond document noise — it is exactly what "
-                        "the calibration subtracts, and it must be re-measured after every phase; "
-                        "the 3.6 synthetic suite decides whether the corrected ranking is fair"
+                        (
+                            "a language-level offset exists beyond document noise; under the "
+                            "report-only policy it is NOT subtracted — the 3.6 suite showed that "
+                            "subtracting it breaks every same-text comparison — but carried as the "
+                            "systematic uncertainty of every cross-language margin "
+                            "(CalibrationTable.margin_uncertainty_bits) and re-measured after "
+                            "every phase"
+                        )
+                        if tables[adopt]["policy"] == "report-only"
+                        else (
+                            "a language-level offset exists beyond document noise — it is exactly "
+                            "what the calibration subtracts, and it must be re-measured after every "
+                            "phase; the 3.6 synthetic suite decides whether the corrected ranking "
+                            "is fair"
+                        )
                     )
                     if above
                     else "language-level offsets are within document-to-document dispersion"
@@ -284,18 +321,21 @@ def main() -> None:
             f["id"] for f in findings if f["above_noise"] and not f["escalated"]
         ],
     }
-    out_dir = root / "analysis" / "phase3"
+    out_dir = args.out_dir
+    out_dir.mkdir(parents=True, exist_ok=True)
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "fairness_audit.json").write_text(json.dumps(report, indent=1))
     md = render(report)
-    (REPO / "docs" / "phase3_fairness_audit.md").write_text(md)
+    args.doc.write_text(md)
     print(md)
     if not args.no_clearml:
         from diff_voyn.infra.clearml_task import init_task
         from diff_voyn.infra.config import RunConfig
 
         task = init_task(
-            RunConfig(run_name="fairness-audit", phase="phase3"), root, tags=["task3.5"]
+            RunConfig(run_name="fairness-audit", phase=args.phase_tag),
+            root,
+            tags=["task3.5"],
         )
         task.connect_configuration(report, name="fairness_audit")
         logger = task.get_logger()
@@ -323,13 +363,16 @@ def render(rep: dict) -> str:
         "",
         "## Offsets by calibration table (backbone × reference tier)",
         "",
-        "| table | backbone | reference | latin | italian | german | spread |",
-        "|---|---|---|---|---|---|---|",
+        "| table | backbone | reference | policy | latin | italian | german | spread |",
+        "|---|---|---|---|---|---|---|---|",
     ]
     for v, t in rep["tables"].items():
         o, s = t["offsets_bits"], t["offsets_sem"]
+        pol = t["policy"] + (
+            f" (from {t['derived_from']})" if t["derived_from"] else ""
+        )
         L.append(
-            f"| {v} | {t['backbone_run']} | {Path(t['ar_dir'] or '?').name} | "
+            f"| {v} | {t['backbone_run']} | {Path(t['ar_dir'] or '?').name} | {pol} | "
             + " | ".join(f"{o[l]:+.3f} ± {s[l]:.3f}" for l in LANGS)
             + f" | {t['summary']['spread_bits']:.3f} |"
         )

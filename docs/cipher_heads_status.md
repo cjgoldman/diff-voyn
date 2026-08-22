@@ -221,3 +221,20 @@ design note the plan asks for). Highlights:
   trials/cell smoke levels.
 - Rung-4 next levers (design note §6): more restarts for the 0.02-bit
   near-misses, exact-EM interleave on the assignment, pair-swap polish.
+
+## Side study — robustness of the n-gram judges vs the diffusion judges (2026-08-22)
+
+`scripts/ngram_robustness.py` scores the CH.0 LMs (orders 1/2/3/5) on the
+*same* noised windows as the task-2.6 robustness curves and ranks languages
+with both judges. Record: **[ngram_judge_robustness.md](ngram_judge_robustness.md)**.
+Short version: under a wrong key the n-gram cost never saturates (it climbs
+through the shuffled-letters ceiling, 1.3–2.7× the clean→shuffled gap at a
+fully wrong key) while the diffusion judge saturates at ~0.55 of its gap —
+the n-gram objective is the better far-from-key search signal, the ELBO the
+better near-key judge; under parse/transcription errors the n-gram judges
+spend about half the share of their range the diffusion judge does; and as
+*language* judges the n-gram LMs drift to "German" under any corruption
+(Italian lost at 5–10 % wrong key, Latin at 20–30 %, German never), a
+severity-dependent bias no static offset removes, whereas the Phase-C judge's
+call is flat to a 50 %-wrong key — a property of the Phase-B curriculum, not
+the architecture (the clean Phase-A model fails as fast as the n-grams).

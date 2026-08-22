@@ -151,17 +151,29 @@ class Backbone(nn.Module):
             if isinstance(module, nn.Linear) and module.bias is not None:
                 nn.init.zeros_(module.bias)
 
+    def hidden(
+        self,
+        z_t: torch.Tensor,
+        lang_idx: torch.Tensor,
+        g: torch.Generator | None = None,
+    ) -> torch.Tensor:
+        """Final-layer hidden states after the last norm, ``[B, L, d_model]``
+        — the feature map of the language-ID head (task 4.1, design §6).
+        Everything :meth:`forward` computes except the vocabulary projection;
+        no parameters are added, so checkpoints are unchanged."""
+        h = self.embed(z_t) + self.lang_cond(lang_idx, g)
+        h = self.embed_dropout(h)
+        for block in self.blocks:
+            h = block(h, self.rotary)
+        return self.final_norm(h)
+
     def forward(
         self,
         z_t: torch.Tensor,
         lang_idx: torch.Tensor,
         g: torch.Generator | None = None,
     ) -> torch.Tensor:
-        h = self.embed(z_t) + self.lang_cond(lang_idx, g)
-        h = self.embed_dropout(h)
-        for block in self.blocks:
-            h = block(h, self.rotary)
-        return subs_parameterize(self.head(self.final_norm(h)))
+        return subs_parameterize(self.head(self.hidden(z_t, lang_idx, g)))
 
     def forward_soft(
         self,
