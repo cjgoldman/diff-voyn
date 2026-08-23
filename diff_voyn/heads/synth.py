@@ -143,6 +143,35 @@ def gen_arithmetic(
     )
 
 
+@dataclass
+class NaibbeInstance:
+    """Rung-3 ground truth: ``tokens`` is what the head sees (the
+    whitespace-free stream is their concatenation); ``plain_ids`` is the
+    23-letter pre-mapped plaintext (k→c, w→uu) in frozen-alphabet ids — the
+    text the decode is compared against; the glyph→letter key is the
+    published apparatus (``NaibbeParser.block_truth``)."""
+
+    language: str
+    plain_ids: np.ndarray
+    tokens: list[str]
+    segments: list[str]
+    cipher_seed: int
+
+
+def gen_naibbe(
+    plain_ids: np.ndarray, language: str, rng: np.random.Generator
+) -> NaibbeInstance:
+    from ..ciphers.naibbe import NaibbeCipher
+    from ..vocab import LETTERS
+    from .ngram import LETTER_TO_IDX
+
+    text = "".join(LETTERS[i] for i in plain_ids)
+    seed = int(rng.integers(2**31))
+    tokens, segments = NaibbeCipher(seed=seed).encipher(text)
+    plain23 = np.array([LETTER_TO_IDX[c] for c in "".join(segments)], dtype=np.int64)
+    return NaibbeInstance(language, plain23, tokens, segments, seed)
+
+
 # -- metrics ----------------------------------------------------------------
 
 

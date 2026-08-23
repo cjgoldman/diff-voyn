@@ -13,7 +13,7 @@ drives it (the whole point of CH.1).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 import torch
@@ -37,6 +37,9 @@ class Rung1Result:
     hard_score: float  # exact n-gram-order score of the decode (nats)
     n_evals: int  # evaluator calls (R6 cost realism)
     restarts_used: int
+    # distinct local optima visited, best first: [(perm, hard_score, source)]
+    # — the shortlist the diffusion tier re-ranks (design §7.4 two-tier)
+    shortlist: list = field(default_factory=list)
 
 
 class SinkhornSubstitutionHead:
@@ -124,11 +127,14 @@ class SinkhornSubstitutionHead:
         language: str,
         rng: np.random.Generator,
         kicks: int = 20,
+        visited: list | None = None,
     ) -> tuple[np.ndarray, float, int]:
         """Iterated local search: climb, perturb (3 random transpositions),
         re-climb, keep improvements — the classical escape from the 2-swap
         local optima that dominate short ciphers."""
         perm, best, n = self._swap_hillclimb(cipher_np, perm, language)
+        if visited is not None:
+            visited.append((perm.copy(), best, "ils"))
         for _ in range(kicks):
             cand = perm.copy()
             for _ in range(3):
@@ -136,6 +142,8 @@ class SinkhornSubstitutionHead:
                 cand[i], cand[j] = cand[j], cand[i]
             cand, s, dn = self._swap_hillclimb(cipher_np, cand, language)
             n += dn
+            if visited is not None:
+                visited.append((cand.copy(), s, "ils"))
             if s > best:
                 perm, best = cand, s
         return perm, best, n
@@ -156,14 +164,18 @@ class SinkhornSubstitutionHead:
         restarts: int = 4,
         kicks: int = 20,
         target_score: float | None = None,
+        shortlist: int = 8,
     ) -> Rung1Result:
+        """``shortlist``: keep that many distinct local optima (best first)
+        in ``Rung1Result.shortlist`` for the outer (diffusion) tier."""
         cipher_t = torch.from_numpy(cipher_ids.astype(np.int64))
         rng = np.random.default_rng(self.seed)
         best: Rung1Result | None = None
+        visited: list = []
 
         def consider(perm, soft, n_evals, r):
             nonlocal best
-            perm, hard, n2 = self._ils(cipher_ids, perm, language, rng, kicks)
+            perm, hard, n2 = self._ils(cipher_ids, perm, language, rng, kicks, visited)
             if best is None or hard > best.hard_score:
                 best = Rung1Result(perm, soft, hard, n_evals + n2, r + 1)
 
@@ -176,4 +188,14 @@ class SinkhornSubstitutionHead:
             perm, soft, n1 = self._gradient_phase(cipher_t, language, g)
             consider(perm, -soft, n1, r + 1)
         assert best is not None
+        seen, short = set(), []
+        for perm, hard, src in sorted(visited, key=lambda v: -v[1]):
+            key = perm.tobytes()
+            if key in seen:
+                continue
+            seen.add(key)
+            short.append((perm, float(hard), src))
+            if len(short) >= shortlist:
+                break
+        best.shortlist = short
         return best

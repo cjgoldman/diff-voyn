@@ -496,3 +496,208 @@ def test_rung4_solve_smoke(toy_ev, toy_trans):
     assert np.isfinite(res.raw_ll)
     assert len(res.decoded) > 0
     assert res.v_accuracy(v) == 1.0  # order-derived init is exact here
+
+
+# ------------------------------------------------- Phase 5: two-tier pieces
+
+
+def test_viterbi_segmental_matches_enumeration(toy_ev):
+    """Viterbi path score == max over enumerated (branch, letters) paths.
+    Emissions are supported on 3 letters each so the enumeration is exact
+    and small (the Viterbi itself runs over the full alphabet)."""
+    import itertools
+
+    from diff_voyn.heads.evaluator import TokenEmission
+
+    rng = np.random.default_rng(3)
+    ems, supports = [], []
+    for _ in range(3):
+        sup = rng.choice(A, size=3, replace=False)
+        dists = []
+        for _ in range(3):
+            d = torch.full((A,), 1e-30)
+            d[sup] = torch.from_numpy(rng.dirichlet(np.ones(3))).float()
+            dists.append(d)
+        ems.append(
+            TokenEmission(
+                uni=dists[0],
+                pre=dists[1],
+                suf=dists[2],
+                log_w_uni=np.log(0.6),
+                log_w_bi=np.log(0.4),
+            )
+        )
+        supports.append(sup)
+    letters, branches, score = toy_ev.viterbi_segmental(ems, language="toy")
+    assert len(letters) == sum(1 if b == 0 else 2 for b in branches)
+    l1, l2, l3 = (toy_ev.logT("toy", k).cpu().numpy() for k in (1, 2, 3))
+    best = -np.inf
+    for bchoice in itertools.product([0, 1], repeat=3):
+        slots = []  # (token, dist index) per emitted letter
+        for ti, b in enumerate(bchoice):
+            slots += [(ti, 0)] if b == 0 else [(ti, 1), (ti, 2)]
+        for lets in itertools.product(*[supports[ti] for ti, _ in slots]):
+            lp = sum(np.log(0.6) if b == 0 else np.log(0.4) for b in bchoice)
+            for (ti, di), l in zip(slots, lets):
+                em = ems[ti]
+                d = (em.uni, em.pre, em.suf)[di]
+                lp += float(torch.log(d[l]))
+            ids = np.array(lets)
+            # DP start convention: phantom (a, b) ~ stationary bigram, maxed
+            st = l1[:, None] + l2  # phantom (a, b)
+            for l in ids:
+                nxt = (st + l3[:, :, l]).max(0)  # (b, c=l) over a -> (b,)
+                # new state (b, l): st'[b', c'] defined only at c'=l
+                new = np.full_like(st, -np.inf)
+                new[:, l] = nxt
+                st = new
+            best = max(best, lp + st.max())
+    assert score == pytest.approx(best, abs=1e-3)
+
+
+def test_emissions_to_frame_and_paired_bits_toy_backbone():
+    from diff_voyn.heads.diffusion_eval import DiffusionEvaluator, emissions_to_frame
+    from diff_voyn.heads.evaluator import TokenEmission
+    from diff_voyn.heads.two_tier import Candidate, paired_bits, rescore, select
+    from diff_voyn.infra.config import ModelConfig
+    from diff_voyn.infra.nelbo import per_window_nelbo_bits
+    from diff_voyn.model.backbone import Backbone
+    from diff_voyn.vocab import LETTER_IDS, NULL_ID
+
+    torch.manual_seed(0)
+    cfg = ModelConfig(n_layers=2, d_model=64, n_heads=4, d_ffn=128, seq_len=32)
+    ev = DiffusionEvaluator(Backbone(cfg), n_strata=4, seed=0, window=32)
+    # branch lists collapse onto the 2N frame; NULL mass == unigram weight
+    uni = torch.softmax(torch.randn(A), 0)
+    pre = torch.softmax(torch.randn(A), 0)
+    suf = torch.softmax(torch.randn(A), 0)
+    em = TokenEmission(branches=[(np.log(0.3), [uni]), (np.log(0.7), [pre, suf])])
+    fr = emissions_to_frame([em])
+    assert fr.shape == (2, 32)
+    assert torch.allclose(fr.sum(1), torch.ones(2), atol=1e-6)
+    assert fr[1, NULL_ID] == pytest.approx(0.3, abs=1e-6)
+    # paired_bits == per_window_nelbo_bits for a single row and the same seed
+    rows = np.random.default_rng(0).integers(0, A, size=(3, 20))
+    pb = paired_bits(ev, rows, ["latin", "german"], n_strata=4, seed=5)
+    for i in range(3):
+        ref = per_window_nelbo_bits(
+            ev.backbone,
+            torch.from_numpy(rows[i : i + 1] + LETTER_IDS[0]),
+            0,
+            n_strata=4,
+            seed=5,
+        )[0]
+        assert pb[i, 0] == pytest.approx(float(ref), abs=1e-4)
+    # windows longer than the context are chunked and length-averaged
+    long_rows = np.random.default_rng(1).integers(0, A, size=(2, 70))
+    pb_long = paired_bits(ev, long_rows, ["latin"], n_strata=2, seed=1)
+    assert np.isfinite(pb_long).all()
+    assert (
+        float(ev.score_ids(long_rows, language="latin", n_strata=2, seed=1)[0, 0]) > 0
+    )
+    # rescore / select bookkeeping
+    cands = [
+        Candidate(decode=rows[i], key=i, inner_score=float(i), extra={"ser": 0.1 * i})
+        for i in range(3)
+    ]
+    rescore(
+        ev, cands, language="latin", conditions=["latin", "german"], n_strata=4, seed=5
+    )
+    pick = select(cands, language="latin")
+    assert pick["ngram"].key == 2 and pick["oracle"].key == 0
+    assert pick["diffusion"].bits["latin"] == min(c.bits["latin"] for c in cands)
+
+
+def test_refine_assignment_smoke_toy_backbone():
+    from diff_voyn.heads.diffusion_eval import DiffusionEvaluator
+    from diff_voyn.heads.ladder import refine_assignment
+    from diff_voyn.infra.config import ModelConfig
+    from diff_voyn.model.backbone import Backbone
+
+    torch.manual_seed(0)
+    cfg = ModelConfig(n_layers=1, d_model=32, n_heads=4, d_ffn=64, seq_len=32)
+    ev = DiffusionEvaluator(Backbone(cfg), n_strata=2, seed=0, window=32)
+    cipher = np.random.default_rng(0).integers(0, A, size=24)
+    perm = np.random.default_rng(1).permutation(A)
+    out, losses = refine_assignment(
+        ev, cipher, perm, language="latin", bijective=True, steps=2, n_strata=2
+    )
+    assert (
+        sorted(out.tolist()) == list(range(A))
+        and len(losses) == 2
+        and np.isfinite(losses).all()
+    )
+    sym_map = np.random.default_rng(2).integers(0, A, size=30)
+    out2, _ = refine_assignment(
+        ev, cipher, sym_map, language="latin", bijective=False, steps=2, n_strata=2
+    )
+    assert out2.shape == (30,) and out2.min() >= 0 and out2.max() < A
+
+
+def test_scale_terms():
+    from diff_voyn.heads.scale import CellScore, choice_bits, key_bits, log2_factorial
+
+    assert key_bits("sub1to1") == pytest.approx(log2_factorial(25))
+    assert key_bits("homophonic", n_symbols=54) == pytest.approx(54 * np.log2(25))
+    assert (
+        key_bits("naibbe") > key_bits("homophonic", n_symbols=54) > key_bits("sub1to1")
+    )
+    dec = np.array([0, 1, 1, 2])
+    assert choice_bits("sub1to1", dec) == 0.0
+    s2l = np.array([0, 1, 1, 2, 2, 2])  # letter 1 has 2 homophones, letter 2 has 3
+    assert choice_bits("homophonic", dec, sym_to_letter=s2l) == pytest.approx(
+        2 * np.log2(2) + np.log2(3)
+    )
+    assert choice_bits(
+        "naibbe", dec, card_weights={"a": 1, "b": 1}, p_unigram=0.5, n_tokens=4
+    ) == pytest.approx(4 * 2.0)
+    assert choice_bits(
+        "arithmetic", dec, n_homophones=4, zipf_exponent=0.0
+    ) == pytest.approx(4 * 2.0)
+    c = CellScore("sub1to1", "latin", 100, 2.0, 80.0, 20.0)
+    assert c.total_bits_per_char == pytest.approx(3.0)
+
+
+def test_rung2_pair_polish_and_elbo_polish_toy():
+    """polish_pairs never lowers the penalized objective; elbo_polish on a
+    toy backbone returns a valid map and never a worse (confirmed) one."""
+    from diff_voyn.heads.diffusion_eval import DiffusionEvaluator
+    from diff_voyn.heads.ladder import elbo_polish
+    from diff_voyn.heads.rung2_homophonic import HomophonicHead
+    from diff_voyn.heads.scale import choice_bits
+    from diff_voyn.infra.config import ModelConfig
+    from diff_voyn.model.backbone import Backbone
+
+    rng = np.random.default_rng(0)
+    n_sym = 12
+    rng.integers(0, A, size=n_sym)
+    cipher = rng.integers(0, n_sym, size=40)
+    # n-gram pair polish on the toy evaluator: monotone
+    from diff_voyn.heads.ngram import train_lm
+
+    trans = rng.dirichlet(np.full(A, 0.15), size=A)
+    stream = _markov_sample(trans, 20_000, rng).astype(np.uint8)
+    ev = NgramEvaluator({"toy": train_lm("toy", [stream], k_max=5)})
+    head = HomophonicHead(ev, seed=0)
+    start = rng.integers(0, A, size=n_sym)
+    s0 = head._objective(start[cipher], "toy")
+    m, s1, n = head.polish_pairs(cipher, start, "toy")
+    assert s1 >= s0 and m.shape == (n_sym,) and n > 0
+    # ELBO polish on a toy backbone
+    torch.manual_seed(0)
+    cfg = ModelConfig(n_layers=1, d_model=32, n_heads=4, d_ffn=64, seq_len=64)
+    dev = DiffusionEvaluator(Backbone(cfg), n_strata=2, seed=0, window=64)
+    out, info = elbo_polish(
+        dev,
+        cipher,
+        start,
+        language="latin",
+        sweeps=2,
+        budget=2,
+        confirm_budget=2,
+        choice_fn=lambda mm, dec: choice_bits("homophonic", dec, sym_to_letter=mm)
+        / len(dec),
+        pair_swaps=True,
+    )
+    assert out.shape == (n_sym,) and out.min() >= 0 and out.max() < A
+    assert info["confirm_mdl"][0] <= info["confirm_mdl"][1] or not info["accepted"]

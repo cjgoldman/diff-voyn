@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import multiprocessing as mp
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 import torch
@@ -58,6 +58,9 @@ class Rung2Result:
     n_evals: int
     restarts_used: int
     raw_ll: float = float("nan")  # unpenalized exact n-gram log-likelihood
+    # distinct restart optima, best penalized objective first:
+    # [(sym_map, penalized_score, raw_ll)] — the outer tier's shortlist
+    shortlist: list = field(default_factory=list)
 
 
 class HomophonicHead:
@@ -205,6 +208,46 @@ class HomophonicHead:
                         sym_map[s] = cur
         return sym_map, score, n_evals
 
+    def polish_pairs(
+        self, cipher_np: np.ndarray, sym_map: np.ndarray, language: str
+    ) -> tuple[np.ndarray, float, int]:
+        """Greedy polish with an enriched move set: single-symbol
+        reassignments AND symbol-pair letter swaps (the CH.5 "pair-swap"
+        lever for in-basin, polish-limited solves), under the penalized
+        objective, until no move improves. Exhaustive: 54·25 + C(54,2)
+        candidates per sweep, ~0.1 ms each."""
+        sym_map = sym_map.copy()
+        n_symbols = len(sym_map)
+        score = self._objective(sym_map[cipher_np], language)
+        n_evals = 1
+        improved = True
+        while improved:
+            improved = False
+            for s in range(n_symbols):
+                cur = sym_map[s]
+                for letter in range(A):
+                    if letter == cur:
+                        continue
+                    sym_map[s] = letter
+                    sc = self._objective(sym_map[cipher_np], language)
+                    n_evals += 1
+                    if sc > score + 1e-9:
+                        score, cur, improved = sc, letter, True
+                    else:
+                        sym_map[s] = cur
+            for s1 in range(n_symbols):
+                for s2 in range(s1 + 1, n_symbols):
+                    if sym_map[s1] == sym_map[s2]:
+                        continue
+                    sym_map[s1], sym_map[s2] = sym_map[s2], sym_map[s1]
+                    sc = self._objective(sym_map[cipher_np], language)
+                    n_evals += 1
+                    if sc > score + 1e-9:
+                        score, improved = sc, True
+                    else:
+                        sym_map[s1], sym_map[s2] = sym_map[s2], sym_map[s1]
+        return sym_map, score, n_evals
+
     def _frequency_init(
         self,
         cipher_np: np.ndarray,
@@ -294,6 +337,7 @@ class HomophonicHead:
         sa_steps: int = 100_000,
         t_start: float = 15.0,
         t_end: float = 0.5,
+        shortlist: int = 12,
     ) -> Rung2Result:
         """Random-restart SA fanned out over forked worker processes.
 
@@ -325,4 +369,23 @@ class HomophonicHead:
         res.raw_ll = self.ev.score_hard(
             best_map[cipher_ids], language=language, order=self.rescore_order
         )
+        seen = set()
+        for m, s, _ in sorted(results, key=lambda r: -r[1]):
+            k = m.tobytes()
+            if k in seen:
+                continue
+            seen.add(k)
+            res.shortlist.append(
+                (
+                    m,
+                    float(s),
+                    float(
+                        self.ev.score_hard(
+                            m[cipher_ids], language=language, order=self.rescore_order
+                        )
+                    ),
+                )
+            )
+            if len(res.shortlist) >= shortlist:
+                break
         return res

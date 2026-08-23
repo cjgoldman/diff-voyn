@@ -16,7 +16,7 @@ Restart-friendly by seed. The head never names its evaluator (CH.1).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 import torch
@@ -273,6 +273,9 @@ class BlockResult:
     score: float
     n_evals: int
     restarts_used: int
+    # every restart's (polished) maps with its hard DP score, best first —
+    # the outer tier's shortlist: [(block_maps, score, source)]
+    shortlist: list = field(default_factory=list)
 
     def code_accuracy(self, parser: NaibbeParser) -> dict[str, float]:
         parser.build_blocks()
@@ -449,16 +452,126 @@ class NaibbeBlockHead:
             ems = self._emissions_from(parses, likes, torch.zeros(()))
             return float(self.ev.score_segmental(ems, language=language))
 
+    # -- hard decode / fixed-parse polish (Phase 5 search lever) -------------
+
+    def _type_letter(self, maps) -> dict[str, np.ndarray]:
+        """Hard letter (frozen-alphabet id) per glyph type: deck-weighted
+        vote over the type's cells under hard block maps."""
+        out = {}
+        for state in STATES:
+            n_types = len(self.parser.types[state])
+            votes = np.zeros((n_types, len(self.parser.letter_support)))
+            for t, cells in enumerate(self.parser.type_cells[state]):
+                for table, row in cells:
+                    votes[t, maps[(state, table)][row]] += self.table_w[table]
+            out[state] = self.parser.letter_support[votes.argmax(1)]
+        return out
+
+    def decode(self, parses, maps, language):
+        """Viterbi decode under hard maps: (letters, branch per token)."""
+        blocks = {}
+        for key, m in maps.items():
+            b = torch.zeros(len(m), len(m))
+            b[torch.arange(len(m)), torch.from_numpy(np.asarray(m))] = 1.0
+            blocks[key] = b
+        likes = self._type_likelihoods(blocks)
+        ems = self._emissions_from(parses, likes, torch.zeros(()))
+        letters, branches, score = self.ev.viterbi_segmental(ems, language=language)
+        return letters, branches, score
+
+    def _parse_positions(self, parses, branches):
+        """Per decoded letter: (state, type id) given the chosen branches."""
+        pos = []
+        for p, bi in zip(parses, branches):
+            br = []
+            if p.uni is not None:
+                br.append(("unigram", p.uni))
+            for pre_id, suf_id in p.bi:
+                br.append(("bigram", (pre_id, suf_id)))
+            kind, ids = br[bi]
+            if kind == "unigram":
+                pos.append(("unigram", ids))
+            else:
+                pos.append(("prefix", ids[0]))
+                pos.append(("suffix", ids[1]))
+        return pos
+
+    def polish(
+        self,
+        parses,
+        maps: dict,
+        language: str,
+        *,
+        rounds: int = 3,
+        order: int = 5,
+    ) -> tuple[dict, float, int]:
+        """Within-block 2-swap hill-climb under a FIXED parse (the Viterbi
+        branches of the current maps) scored by the exact order-``order``
+        n-gram of the decoded letters — milliseconds per move, so the full
+        18 × C(23,2) swap neighbourhood is exhaustive. Re-parse between
+        rounds; stop when the hard DP score stops improving."""
+        maps = {k: np.asarray(v).copy() for k, v in maps.items()}
+        best_dp = self._hard_score(parses, maps, language)
+        n_evals = 1
+        for _ in range(rounds):
+            _, branches, _ = self.decode(parses, maps, language)
+            pos = self._parse_positions(parses, branches)
+            state_of = np.array([STATES.index(s) for s, _ in pos])
+            type_of = np.array([t for _, t in pos])
+            tl = self._type_letter(maps)
+
+            n_pos = len(pos)
+
+            def decoded(tl, n=n_pos, state_of=state_of, type_of=type_of):
+                out = np.empty(n, dtype=np.int64)
+                for si, state in enumerate(STATES):
+                    sel = state_of == si
+                    out[sel] = tl[state][type_of[sel]]
+                return out
+
+            cur = self.ev.score_hard(decoded(tl), language=language, order=order)
+            n_evals += 1
+            improved_any = False
+            improved = True
+            while improved:
+                improved = False
+                for key in maps:
+                    state = key[0]
+                    m = maps[key]
+                    n = len(m)
+                    for i in range(n):
+                        for j in range(i + 1, n):
+                            m[i], m[j] = m[j], m[i]
+                            tl2 = dict(tl)
+                            tl2[state] = self._type_letter(maps)[state]
+                            sc = self.ev.score_hard(
+                                decoded(tl2), language=language, order=order
+                            )
+                            n_evals += 1
+                            if sc > cur + 1e-9:
+                                cur, tl, improved, improved_any = sc, tl2, True, True
+                            else:
+                                m[i], m[j] = m[j], m[i]
+            dp = self._hard_score(parses, maps, language)
+            n_evals += 1
+            if dp <= best_dp + 1e-6 or not improved_any:
+                best_dp = max(best_dp, dp)
+                break
+            best_dp = dp
+        return maps, best_dp, n_evals
+
     def solve(
         self,
         tokens: list[str],
         *,
         language: str,
         restarts: int = 3,
+        polish: bool = True,
     ) -> BlockResult:
         parses = self.parser.parse_stream(tokens)
         best = None
         total_evals = 0
+        short = []
         for r in range(restarts):
             g = torch.Generator().manual_seed(self.seed + 1000 * r)
             logits, _w, n = self._gradient_phase(parses, language, g)
@@ -466,8 +579,74 @@ class NaibbeBlockHead:
             maps = self._project(logits)
             score = self._hard_score(parses, maps, language)
             total_evals += 1
+            short.append(
+                ({k: v.copy() for k, v in maps.items()}, float(score), f"restart{r}")
+            )
+            if polish:
+                maps, score, n = self.polish(parses, maps, language)
+                total_evals += n
+                short.append(
+                    (
+                        {k: v.copy() for k, v in maps.items()},
+                        float(score),
+                        f"restart{r}+polish",
+                    )
+                )
             if best is None or score > best.score:
                 best = BlockResult(maps, score, total_evals, r + 1)
         assert best is not None
         best.n_evals = total_evals
+        best.shortlist = sorted(short, key=lambda x: -x[1])
         return best
+
+    # -- outer tier: soft refinement through a frozen diffusion evaluator ---
+
+    def refine_frame(
+        self,
+        diffusion_ev,
+        parses,
+        maps: dict,
+        language: str,
+        *,
+        steps: int = 40,
+        lr: float = 0.1,
+        n_strata: int = 4,
+        init_scale: float = 4.0,
+        chunk_tokens: int = 500,
+        seed: int = 0,
+    ) -> tuple[dict, list[float]]:
+        """Expected-embedding refinement (R3): block Sinkhorn logits
+        initialised at the hard maps, emissions collapsed onto the 2N-slot
+        frame (``emissions_to_frame``), one random ≤ ``chunk_tokens`` token
+        window per step, scored by the frozen diffusion evaluator with a
+        fresh masking seed; Hungarian projection at the end."""
+        from .diffusion_eval import emissions_to_frame
+        from .rung1_sinkhorn import sinkhorn
+
+        n_sup = len(self.parser.letter_support)
+        logits = {}
+        for key, m in maps.items():
+            lg = torch.zeros(n_sup, n_sup)
+            lg[torch.arange(n_sup), torch.from_numpy(np.asarray(m))] = init_scale
+            logits[key] = lg.requires_grad_(True)
+        opt = torch.optim.Adam(list(logits.values()), lr=lr)
+        g = torch.Generator().manual_seed(seed)
+        n_chunks = max(1, (len(parses) + chunk_tokens - 1) // chunk_tokens)
+        losses = []
+        for step in range(steps):
+            blocks = {k: sinkhorn(lg) for k, lg in logits.items()}
+            likes = self._type_likelihoods(blocks)
+            ci = int(torch.randint(n_chunks, (1,), generator=g))
+            chunk = parses[ci * chunk_tokens : (ci + 1) * chunk_tokens]
+            ems = self._emissions_from(chunk, likes, torch.zeros(()))
+            frame = emissions_to_frame(ems)
+            n_letters = sum(2 - (p.uni is not None) for p in chunk)
+            score = diffusion_ev.score_frame(
+                frame, language=language, seed=seed + step, n_strata=n_strata
+            )
+            loss = -score / max(n_letters, 1)
+            opt.zero_grad()
+            loss.backward()
+            opt.step()
+            losses.append(float(loss.detach()))
+        return self._project({k: lg.detach() for k, lg in logits.items()}), losses

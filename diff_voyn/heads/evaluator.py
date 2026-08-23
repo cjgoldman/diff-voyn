@@ -249,6 +249,64 @@ class NgramEvaluator(EvaluatorBase):
                 alpha = torch.logaddexp(alpha, b)
         return torch.logsumexp(alpha.reshape(-1), dim=0)
 
+    def viterbi_segmental(
+        self, emissions: list[TokenEmission], *, language: str
+    ) -> tuple[np.ndarray, list[int], float]:
+        """Max-probability (branch, letters) path of the trigram-state
+        semi-Markov DP — the hard decode behind :meth:`score_segmental`.
+
+        Returns ``(letters, branch_index_per_token, path_log_prob)`` where
+        ``branch_index_per_token[i]`` indexes ``emissions[i].iter_branches()``.
+        Used by the rung-3 polish (fixed-parse discrete moves) and to hand
+        hard decodes to the outer tier.
+        """
+        with torch.no_grad():
+            logT3 = self.logT(language, min(self.dp_order, 3))
+            dev = logT3.device
+            alpha = self.logT(language, 1)[:, None] + self.logT(language, 2)
+            back = []
+            for em in emissions:
+                outs, metas = [], []
+                for bi, (log_w, dists) in enumerate(em.iter_branches()):
+                    if not _finite_w(log_w):
+                        continue
+                    b = alpha
+                    ptrs = []
+                    for q in dists:
+                        x = b[:, :, None] + logT3
+                        inner, arg_a = x.max(dim=0)
+                        b = inner + torch.log(q.to(dev).clamp_min(1e-45))[None, :]
+                        ptrs.append(arg_a)
+                    outs.append(b + _as_t(log_w, dev))
+                    metas.append((bi, ptrs))
+                if not outs:
+                    raise ValueError("token with no feasible branch (all -inf)")
+                stacked = torch.stack(outs)
+                alpha, arg_k = stacked.max(dim=0)
+                back.append((metas, arg_k))
+            flat = int(alpha.argmax())
+            x, y = divmod(flat, A)
+            score = float(alpha[x, y])
+            letters_rev, branches_rev = [], []
+            for metas, arg_k in reversed(back):
+                k = int(arg_k[x, y])
+                bi, ptrs = metas[k]
+                branches_rev.append(bi)
+                if len(ptrs) == 2:
+                    letters_rev.extend([y, x])
+                    b = int(ptrs[1][x, y])
+                    a = int(ptrs[0][b, x])
+                    x, y = a, b
+                else:
+                    letters_rev.append(y)
+                    a = int(ptrs[0][x, y])
+                    x, y = a, x
+            return (
+                np.array(letters_rev[::-1], dtype=np.int64),
+                branches_rev[::-1],
+                score,
+            )
+
     # -- char-lattice segmental DP (rung 4) ----------------------------------
     #
     # Like ``score_hard``, these are NgramEvaluator-only inner-loop scorers

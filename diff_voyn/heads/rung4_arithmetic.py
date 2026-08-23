@@ -225,6 +225,9 @@ class Rung4Result:
     restarts_used: int
     wall_s: float
     extra: dict = field(default_factory=dict)
+    # every restart's final key + decode, best score first — the outer
+    # tier's shortlist: [(v, u, decoded, score, raw_ll, rank)]
+    shortlist: list = field(default_factory=list)
 
     def v_accuracy(self, true_v: np.ndarray) -> float:
         return float(np.mean(self.v == true_v))
@@ -484,6 +487,7 @@ class ArithmeticHead:
         char_t = torch.from_numpy(char_ids)
         best: Rung4Result | None = None
         total_evals = 0
+        short = []
         # restart schedule: order candidates first (order uncertainty is the
         # empirically dominant failure mode), then alternate splits, then
         # jittered repeats of the best-scored order.
@@ -512,6 +516,16 @@ class ArithmeticHead:
                 char_ids, v_i, u_i, language=language, rank=rank
             )
             total_evals += 2
+            short.append(
+                (
+                    v_i.astype(np.int64),
+                    u_i.astype(np.int64),
+                    letters,
+                    float(score),
+                    float(raw_ll3),
+                    rank,
+                )
+            )
             if best is None or score > best.score:
                 best = Rung4Result(
                     v=v_i.astype(np.int64),
@@ -528,6 +542,7 @@ class ArithmeticHead:
         assert best is not None
         best.n_evals = total_evals
         best.wall_s = time.time() - t0
+        best.shortlist = sorted(short, key=lambda x: -x[3])
         return best
 
     def decode_with_key(
