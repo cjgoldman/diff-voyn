@@ -123,3 +123,72 @@ def test_unit_scores_wordhom_shapes():
     assert np.isfinite(S[0, :A]).all() and np.isinf(S[0, A:]).all()
     assert np.isinf(S[2, :A]).all() and np.isfinite(S[2, A:]).all()
     assert disagreements(S, sym_map) == []
+
+
+# -- docs/altloop_vms_plan.md: pair-swap proposer and the §5 tiers -----------
+
+
+def test_pair_swaps_ranks_disjoint_transpositions():
+    from diff_voyn.heads.altloop import pair_swaps
+
+    key = np.array([0, 1, 2, 3])
+    S = np.zeros((4, A))
+    # the judge wants 0<->1 swapped (gain 4) and 2->letter 3 (index 3 unused, gain 2)
+    S[0, 1] = 2.0
+    S[1, 0] = 2.0
+    S[2, 3] = 2.0
+    sw = pair_swaps(S, key, k=4)
+    assert [(i, j) for i, j, _ in sw] == [(0, 1), (2, 3)]
+    assert sw[0][2] == 4.0 and sw[1][2] == 2.0
+    assert pair_swaps(S, key, k=1) == [sw[0]]
+    assert pair_swaps(np.zeros((4, A)), key, k=4) == []
+
+
+def test_alternate_pair_swap_keeps_bijection():
+    from diff_voyn.heads.altloop import alternate
+
+    key = np.arange(6)
+    S = np.zeros((6, A))
+    S[0, 1] = S[1, 0] = 3.0
+    seen = []
+    out, info = alternate(
+        key,
+        mechanism="pair_swap",
+        objective=lambda m: float(m[0] == 1),
+        short_sa=lambda m, rng: (m, float(m[0] == 1)),
+        scores_fn=lambda m: S,
+        k=2,
+        rounds=2,
+        on_round=lambda i: seen.append(i["round"]),
+    )
+    assert info["n_accepted"] == 1 and seen == [0, 1]
+    assert sorted(out.tolist()) == list(range(6)) and out[0] == 1 and out[1] == 0
+    out, _ = alternate(
+        key,
+        mechanism="random_swap",
+        objective=lambda m: 0.0,
+        short_sa=lambda m, rng: (m, 1.0),
+        k=2,
+        rounds=1,
+        seed=3,
+    )
+    assert sorted(out.tolist()) == list(range(6)) and (out != key).sum() == 4
+
+
+def test_classify_tier():
+    from diff_voyn.heads.altloop import classify_tier
+
+    assert classify_tier(2.0, 2.5, None) == "PENDING"  # control not in: never flag
+    assert classify_tier(1.20, 2.5, 0.9) == "NOISE"  # below the manuscript ceiling
+    assert classify_tier(1.30, 2.6, 1.10) == "NOTABLE"
+    assert classify_tier(1.30, 2.6, 1.28) == "NOISE"  # a control reached it too
+    assert classify_tier(1.60, 2.6, 1.50) == "NOISE"
+    assert classify_tier(1.55, 2.6, 1.20) == "PROMISING"
+    assert classify_tier(1.55, 2.6, 1.30) == "NOTABLE"  # control above the ceiling
+    assert classify_tier(1.55, 2.6, 1.20, flip_rate=0.0) == "LANGUAGE-LIKE"
+    assert classify_tier(1.55, 2.6, 1.20, flip_rate=0.25) == "PROMISING"
+    assert classify_tier(1.55, 3.2, 1.20, flip_rate=0.0) == "PROMISING"
+    assert (
+        classify_tier(1.55, 2.6, 1.20, flip_rate=0.0, controls_language_like=True)
+        == "PROMISING"
+    )

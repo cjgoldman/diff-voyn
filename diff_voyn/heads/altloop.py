@@ -17,7 +17,90 @@ import numpy as np
 
 from .posterior import disagreements
 
-MECHANISMS = ("posterior", "posterior_sample", "random", "race", "none")
+MECHANISMS = (
+    "posterior",
+    "posterior_sample",
+    "random",
+    "race",
+    "none",
+    "pair_swap",
+    "random_swap",
+)
+
+
+def pair_swaps(
+    scores: np.ndarray, key: np.ndarray, k: int
+) -> list[tuple[int, int, float]]:
+    """Top-``k`` disjoint key-index transpositions ranked by the judge's
+    summed posterior gain — the bijection-preserving proposer for the 1:1
+    head (``docs/altloop_vms_plan.md`` §2). ``key[i]`` is the letter of
+    index ``i``; indices with no occurrences (a 25-slot injective key on a
+    20-symbol stream) have all-zero score rows, so a swap with one of them
+    is scored as the plain reassignment of the occupied index. Returns
+    ``(i, j, gain)`` with ``gain > 0`` only."""
+    key = np.asarray(key, dtype=np.int64)
+    n = len(key)
+    own = scores[np.arange(n), key]  # support for the current letters
+    cand = []
+    for i in range(n):
+        for j in range(i + 1, n):
+            g = scores[i, key[j]] + scores[j, key[i]] - own[i] - own[j]
+            if np.isfinite(g) and g > 0:
+                cand.append((i, j, float(g)))
+    cand.sort(key=lambda x: -x[2])
+    used, out = set(), []
+    for i, j, g in cand:
+        if i in used or j in used:
+            continue
+        used.update((i, j))
+        out.append((i, j, g))
+        if len(out) >= k:
+            break
+    return out
+
+
+# -- "promising" tiers (docs/altloop_vms_plan.md §5, fixed before any
+# manuscript number was read) ------------------------------------------------
+
+TIERS = ("PENDING", "NOISE", "NOTABLE", "PROMISING", "LANGUAGE-LIKE")
+REF_VMS_CEILING = 1.25  # highest Phase-6 manuscript structure margin (1.249)
+REF_TRUE_MIN = 1.49  # lowest true decipherment in the Phase-6 battery
+NOTABLE_MIN = 1.26
+NOTABLE_ABOVE_CONTROLS = 0.15
+ABSTAIN_MAX_PLAIN = 3.0
+ABSTAIN_MIN_MARGIN = 1.5
+
+
+def classify_tier(
+    margin: float,
+    plain_bits: float,
+    controls_best: float | None,
+    *,
+    flip_rate: float | None = None,
+    controls_language_like: bool = False,
+) -> str:
+    """§5: the tier of one ``psamp`` reading given the *best* structure
+    margin either control arm reached on the same cell. ``controls_best``
+    None = a control has not reported yet → PENDING (never flag on a
+    missing control). Anything a control also reaches is NOISE whatever
+    the number. ``flip_rate`` None = replicate seeds not yet in — the
+    LANGUAGE-LIKE tier needs it to be 0."""
+    if controls_best is None:
+        return "PENDING"
+    if margin < NOTABLE_MIN or margin < controls_best + NOTABLE_ABOVE_CONTROLS:
+        return "NOISE"
+    tier = "NOTABLE"
+    if margin >= REF_TRUE_MIN and controls_best < NOTABLE_MIN:
+        tier = "PROMISING"
+        if (
+            plain_bits <= ABSTAIN_MAX_PLAIN
+            and margin >= ABSTAIN_MIN_MARGIN
+            and flip_rate is not None
+            and flip_rate == 0
+            and not controls_language_like
+        ):
+            tier = "LANGUAGE-LIKE"
+    return tier
 
 
 def alternate(
@@ -36,6 +119,7 @@ def alternate(
     rounds: int = 6,
     patience: int = 2,
     seed: int = 0,
+    on_round: Callable[[dict], None] | None = None,
 ) -> tuple[np.ndarray, dict]:
     """Returns the best key by n-gram objective and a per-round trace.
 
@@ -44,7 +128,10 @@ def alternate(
     disagreement set); ``random_unit(sym, cur_unit, rng)`` draws a unit for
     the ``random`` control (same length class as ``cur_unit``); ``race_fn``
     is the ELBO polish for mechanism ``race``; ``none`` runs the short SA
-    alone (the "is it just the extra SA?" control).
+    alone (the "is it just the extra SA?" control). ``pair_swap`` /
+    ``random_swap`` are the bijection-preserving forms (``k`` transpositions
+    of key indices, judge-ranked / uniformly random). ``on_round(info)`` is
+    called after every completed round (streaming metrics).
     """
     if mechanism not in MECHANISMS:
         raise ValueError(mechanism)
@@ -102,6 +189,26 @@ def alternate(
                 u = random_unit(int(s), int(cur[s]), rng)
                 info["reseeded"].append((int(s), int(cur[s]), int(u), None))
                 prop[s] = u
+        elif mechanism == "pair_swap":
+            n_take = k if k is not None else 4
+            sw = pair_swaps(scores_fn(cur), cur, n_take)
+            info["reseeded"] = []
+            for i, j, g in sw:
+                prop[i], prop[j] = cur[j], cur[i]
+                info["reseeded"].append((int(i), int(cur[i]), int(cur[j]), round(g, 3)))
+            if not sw:
+                info["seconds"] = time.time() - t0
+                trace.append(info)
+                if on_round:
+                    on_round(info)
+                break
+        elif mechanism == "random_swap":
+            n_take = k if k is not None else 4
+            idx = rng.permutation(len(cur))[: 2 * n_take]
+            info["reseeded"] = []
+            for i, j in zip(idx[0::2], idx[1::2]):
+                prop[i], prop[j] = cur[j], cur[i]
+                info["reseeded"].append((int(i), int(cur[i]), int(cur[j]), None))
         elif mechanism == "race":
             prop = np.asarray(race_fn(cur), dtype=np.int64)
             info["reseeded"] = [
@@ -127,6 +234,8 @@ def alternate(
         info["obj_out"] = cur_obj
         info["seconds"] = time.time() - t0
         trace.append(info)
+        if on_round:
+            on_round(info)
         if stale >= patience:
             break
     return cur, {

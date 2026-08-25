@@ -1,6 +1,6 @@
 # Plan — diffusion-guided n-gram search on the manuscript, with controls in every cell
 
-Status: **PLAN 2026-08-25, not started.** Follows `docs/alt_loop_plan.md` §7
+Status: **RUNNING 2026-08-25** — `scripts/altloop_vms.py` implemented (tests in `tests/test_altloop.py`); wordhom and homophonic launched 23:10 UTC (GPU 0/1), sub1to1 queued. Implementation note: start keys are the `vms_solves.json` MDL-pick n-gram candidates (§2), not the Phase-6 ELBO-polished keys — the polished key sits ~6500 nats below the n-gram optimum, so an n-gram-accepting loop leaves it in round 1 on every arm. Follows `docs/alt_loop_plan.md` §7
 (proof of life) under time pressure: the three §7.7 carry-forward items are
 *deferred*, and in their place every manuscript cell runs its own
 same-size random control (`rand-k512` / `rand-k8`) and SA-alone control
