@@ -27,7 +27,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from ..data.loader import LANG_TO_INDEX
+from ..data.loader import LANG_TO_INDEX, NULL_LANG_INDEX
 from ..vocab import LETTER_IDS, MASK_ID
 
 LETTER_BASE = LETTER_IDS[0]
@@ -69,6 +69,43 @@ def dedupe(cands: list[Candidate]) -> list[Candidate]:
 
 
 @torch.no_grad()
+def paired_bits_strata(
+    evaluator,
+    rows: np.ndarray,
+    conditions: list[str],
+    *,
+    n_strata: int = 64,
+    seed: int = 0,
+    batch: int = 32,
+) -> np.ndarray:
+    """[n, C, K] per-stratum bits/char contributions of ``rows`` under each
+    condition (same draws as :func:`paired_bits`; ``.mean(-1)`` reproduces it
+    bit-for-bit up to float summation order). K is the number of strata
+    whose mask was non-empty; the divisor stays ``n_strata`` so the mean
+    matches the metrology estimator exactly. The per-stratum values are what
+    a racing polish needs: the paired difference between two rows on the
+    same stratum is low-variance and its spread across strata is an
+    estimate of the estimator's noise."""
+    rows = np.asarray(rows, dtype=np.int64)
+    n, L = rows.shape
+    cuts = evaluator._windows(L)
+    if len(cuts) > 1:
+        cuts = [(a, b) for a, b in cuts if b - a >= evaluator.window // 2]
+    total = None
+    weight = 0.0
+    for wi, (a, b) in enumerate(cuts):
+        ids = torch.from_numpy(rows[:, a:b] + LETTER_BASE).to(evaluator.device)
+        per = _paired_window(
+            evaluator, ids, conditions, n_strata, seed + 7919 * wi, batch, strata=True
+        )
+        if total is None:
+            total = np.zeros((n, len(conditions), n_strata))
+        total[:, :, : per.shape[-1]] += (b - a) * per
+        weight += b - a
+    return total / weight
+
+
+@torch.no_grad()
 def paired_bits(
     evaluator,
     rows: np.ndarray,
@@ -100,7 +137,19 @@ def paired_bits(
     return total / weight
 
 
-def _paired_window(evaluator, ids, conditions, n_strata, seed, batch):
+CONDITION_UNCOND = "uncond"
+
+
+def condition_index(cond: str) -> int:
+    """Language-condition name -> embedding index; ``"uncond"`` is the
+    NULL-language (language-free) dial the backbone was trained on via
+    conditioning dropout (control experiment 6b, arm C)."""
+    if cond == CONDITION_UNCOND:
+        return NULL_LANG_INDEX
+    return LANG_TO_INDEX[cond]
+
+
+def _paired_window(evaluator, ids, conditions, n_strata, seed, batch, strata=False):
     """Strata × rows flattened into batched forwards (draw order per stratum:
     u, then one (1, L) mask — identical to the metrology estimator)."""
     n, L = ids.shape
@@ -119,6 +168,7 @@ def _paired_window(evaluator, ids, conditions, n_strata, seed, batch):
     t_vec = torch.tensor(ts, dtype=torch.float64)
     K = masks.shape[0]
     acc = torch.zeros(n, len(conditions), dtype=torch.float64)
+    per = torch.zeros(n, len(conditions), K, dtype=torch.float64)
     # rows = (stratum k, row i) pairs
     z_all = torch.where(
         masks[:, None, :], torch.full_like(ids, MASK_ID)[None], ids[None]
@@ -127,7 +177,7 @@ def _paired_window(evaluator, ids, conditions, n_strata, seed, batch):
     tgt = ids[None].expand(K, n, L).reshape(K * n, L)
     m_all = masks[:, None, :].expand(K, n, L).reshape(K * n, L)
     for j, cond in enumerate(conditions):
-        lang_idx = LANG_TO_INDEX[cond]
+        lang_idx = condition_index(cond)
         out = torch.zeros(K * n, dtype=torch.float64)
         for start in range(0, K * n, batch):
             zb = z_all[start : start + batch]
@@ -140,7 +190,11 @@ def _paired_window(evaluator, ids, conditions, n_strata, seed, batch):
             nll = -logp.gather(-1, tgt[start : start + batch].unsqueeze(-1)).squeeze(-1)
             nll = nll.masked_fill(~m_all[start : start + batch], 0.0)
             out[start : start + batch] = nll.sum(-1).double().cpu()
-        acc[:, j] = (out.reshape(K, n) / (t_vec[:, None] * L)).sum(0)
+        contrib = out.reshape(K, n) / (t_vec[:, None] * L)  # (K, n)
+        acc[:, j] = contrib.sum(0)
+        per[:, j, :] = contrib.T
+    if strata:
+        return (per / n_strata / math.log(2.0)).numpy()
     return (acc / n_strata / math.log(2.0)).numpy()
 
 

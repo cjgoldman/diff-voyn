@@ -297,6 +297,7 @@ def main() -> None:
     report = {
         "created_utc": datetime.now(UTC).isoformat(),
         "task": "3.5",
+        "phase_tag": args.phase_tag,
         "adopted_table": adopt,
         "tables": {
             v: {k: val for k, val in t.items() if k != "per_document_offsets"}
@@ -350,6 +351,12 @@ def main() -> None:
 
 
 def render(rep: dict) -> str:
+    tag = rep.get("phase_tag", "phase3")
+    title = {
+        "phase3": "Phase 3 — bound-fairness audit (task 3.5)",
+        "phase4": "Phase 4 — bound-fairness audit (task 3.5, re-run)",
+        "phase6": "Phase 6 — bound-fairness audit (task 6.4: §5b re-run, attached to the VMS results)",
+    }.get(tag, f"{tag} — bound-fairness audit")
     intro = (
         f"Generated {rep['created_utc'][:19]}Z by `scripts/fairness_audit.py`; adopted table "
         f"**{rep['adopted_table']}** (`CALIBRATION_VERSION`). Offsets are `NELBO − NLL_AR` in "
@@ -357,7 +364,7 @@ def render(rep: dict) -> str:
         "reference's likelihood)."
     )
     L = [
-        "# Phase 3 — bound-fairness audit (task 3.5)",
+        f"# {title}",
         "",
         intro,
         "",

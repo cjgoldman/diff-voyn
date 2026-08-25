@@ -20,6 +20,24 @@ VOYNICH_ATTACK_SHA = "e324beec4312483551554bc3396515286f35336d"
 NAIBBE_URL = "https://github.com/greshko/naibbe-cipher.git"
 VOYNICH_ATTACK_URL = "https://github.com/alexanderboxer/voynich-attack.git"
 
+# Phase 6 (task 6.6): benchmark anchors — the Borg cipher transcription +
+# Latin plaintext and the Zodiac-408 record, from matthewdgreen/
+# cipher_benchmark (sparse clone, text only; pinned at acquisition 2026-08-23).
+CIPHER_BENCHMARK_SHA = "729aad62d12483c549e64a2541d4f9255538c8cf"
+CIPHER_BENCHMARK_URL = "https://github.com/matthewdgreen/cipher_benchmark.git"
+CIPHER_BENCHMARK_SPARSE = (
+    "benchmark/manifest",
+    "benchmark/docs",
+    "benchmark/sources/borg/transcriptions",
+    "benchmark/sources/borg/plaintext",
+    "benchmark/sources/borg/metadata",
+    "benchmark/sources/zodiac",
+    "scripts",
+)
+# Modern-English public-domain texts for the Zodiac-408 n-gram baseline
+# (English is outside the frozen inventory). Project Gutenberg ids.
+GUTENBERG_ENGLISH_IDS = (98, 1342, 2701, 1661, 84, 11, 345, 76)
+
 
 def data_root() -> Path:
     return Path(os.environ.get("DIFF_VOYN_DATA", "/workspace/data"))
@@ -46,6 +64,10 @@ def _verify(repo: Path, expected_sha: str) -> Path:
 
 def naibbe_repo() -> Path:
     return _verify(data_root() / "external" / "naibbe-cipher", NAIBBE_SHA)
+
+
+def cipher_benchmark_repo() -> Path:
+    return _verify(data_root() / "external" / "cipher_benchmark", CIPHER_BENCHMARK_SHA)
 
 
 def voynich_attack_repo() -> Path:

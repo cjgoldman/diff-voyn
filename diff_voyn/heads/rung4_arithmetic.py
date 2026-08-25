@@ -178,6 +178,51 @@ def infer_char_order(char_ids: np.ndarray, n_sym: int = N_SYM) -> np.ndarray:
     return infer_char_orders(char_ids, n_sym=n_sym, top_k=1)[0]
 
 
+def segmented_admissible_mask(
+    char_ids: np.ndarray, token_starts: np.ndarray
+) -> np.ndarray:
+    """(L, len(SEG_LENGTHS)) bool for an OBSERVED segmentation (task 6.1 —
+    the manuscript's word boundaries are visible, so the rung-4 lattice
+    needs no latent segmentation): segment [i, i+n) is admissible iff i is
+    a token start and i+n is the next start (or the end of the stream).
+    Tokens whose length is outside ``SEG_LENGTHS`` leave no admissible
+    segment — drop them upstream or the lattice has no path."""
+    L = len(char_ids)
+    starts = np.asarray(token_starts, dtype=np.int64)
+    ends = np.concatenate([starts[1:], [L]])
+    adm = np.zeros((L, len(SEG_LENGTHS)), dtype=bool)
+    for s, e in zip(starts, ends):
+        n = int(e - s)
+        if n in SEG_LENGTHS:
+            adm[s, SEG_LENGTHS.index(n)] = True
+    return adm
+
+
+def positional_rank(
+    char_ids: np.ndarray, token_starts: np.ndarray, n_sym: int = N_SYM
+) -> np.ndarray:
+    """Char order from mean within-token relative position (initial → first)
+    — the segmented analogue of ``infer_char_order``, used only to seed
+    ``order_derived_values``; the gradient / polish phases move ``v``."""
+    L = len(char_ids)
+    starts = np.asarray(token_starts, dtype=np.int64)
+    ends = np.concatenate([starts[1:], [L]])
+    pos_sum = np.zeros(n_sym)
+    cnt = np.zeros(n_sym)
+    for s, e in zip(starts, ends):
+        n = e - s
+        if n < 2:
+            continue
+        rel = np.arange(n) / (n - 1)
+        np.add.at(pos_sum, char_ids[s:e], rel)
+        np.add.at(cnt, char_ids[s:e], 1.0)
+    mean_pos = np.where(cnt > 0, pos_sum / np.maximum(cnt, 1), 0.5)
+    order = np.argsort(mean_pos, kind="stable")
+    rank = np.empty(n_sym, dtype=np.int64)
+    rank[order] = np.arange(n_sym)
+    return rank
+
+
 def admissible_mask(char_ids: np.ndarray, rank: np.ndarray) -> np.ndarray:
     """(L, len(SEG_LENGTHS)) bool: segment [i, i+n) is admissible iff it fits
     in the stream and is non-descending in the canonical order."""
@@ -544,6 +589,96 @@ class ArithmeticHead:
         best.wall_s = time.time() - t0
         best.shortlist = sorted(short, key=lambda x: -x[3])
         return best
+
+    def solve_segmented(
+        self,
+        char_ids: np.ndarray,
+        token_starts: np.ndarray,
+        *,
+        language: str,
+        restarts: int = 3,
+        splits: tuple[int, ...] = (2, 1, 3),
+        polish: bool = True,
+    ) -> Rung4Result:
+        """Fixed-segmentation solve (task 6.1): the lattice is the observed
+        token boundaries, the order prior is not needed and ``v`` is seeded
+        from within-token positions. Same gradient / projection / polish
+        machinery as ``solve``."""
+        t0 = time.time()
+        n_sym = int(char_ids.max()) + 1
+        rank = positional_rank(char_ids, token_starts, n_sym=n_sym)
+        adm_np = segmented_admissible_mask(char_ids, token_starts)
+        if not adm_np.any():
+            raise ValueError(
+                "no admissible segment: token lengths outside SEG_LENGTHS?"
+            )
+        adm_t = torch.from_numpy(adm_np)
+        char_t = torch.from_numpy(char_ids)
+        best: Rung4Result | None = None
+        total_evals = 0
+        short = []
+        for r in range(restarts):
+            g = torch.Generator().manual_seed(self.seed + 1000 * r)
+            split = splits[r % len(splits)]
+            v0 = order_derived_values(rank, split)
+            grid, logits, n = self._gradient_phase(char_ids, adm_np, language, v0, g)
+            total_evals += n
+            v_i = np.rint(v0)
+            u_i = self._project_u(grid, logits)
+            if polish:
+                v_i, u_i, score, n = self._polish(v_i, u_i, char_t, adm_t, language)
+                total_evals += n
+            else:
+                score, _ = self._hard_objective(v_i, u_i, char_t, adm_t, language)
+                total_evals += 1
+            _, raw_ll3 = self._hard_objective(
+                v_i, u_i, char_t, adm_t, language, order=3
+            )
+            starts, letters, _ = self.decode_segmented(
+                char_ids, adm_np, v_i, u_i, language=language
+            )
+            total_evals += 2
+            short.append(
+                (
+                    v_i.astype(np.int64),
+                    u_i.astype(np.int64),
+                    letters,
+                    float(score),
+                    float(raw_ll3),
+                    rank,
+                )
+            )
+            if best is None or score > best.score:
+                best = Rung4Result(
+                    v=v_i.astype(np.int64),
+                    u=u_i.astype(np.int64),
+                    score=score,
+                    raw_ll=raw_ll3,
+                    decoded=letters,
+                    seg_starts=starts,
+                    n_evals=total_evals,
+                    restarts_used=r + 1,
+                    wall_s=time.time() - t0,
+                    extra={"split": split, "rank": rank, "segmented": True},
+                )
+        assert best is not None
+        best.n_evals = total_evals
+        best.wall_s = time.time() - t0
+        best.shortlist = sorted(short, key=lambda x: -x[3])
+        return best
+
+    def decode_segmented(self, char_ids, adm_np, v, u, *, language):
+        """Viterbi decode under a given key on a fixed admissible lattice."""
+        ids = torch.from_numpy(np.asarray(char_ids))
+        adm = torch.from_numpy(np.asarray(adm_np))
+        logb = self._log_emissions(
+            torch.tensor(v, dtype=torch.float32),
+            torch.tensor(u, dtype=torch.float32),
+            self.sigma_end,
+            ids,
+            adm,
+        )
+        return self.ev.viterbi_lattice(logb, SEG_LENGTHS, language=language)
 
     def decode_with_key(
         self,

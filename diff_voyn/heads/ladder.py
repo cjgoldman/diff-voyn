@@ -282,6 +282,22 @@ def refine_assignment_tracked(
     return best_key, {"trace": trace, "best_bits": best_bits}
 
 
+CHOICE_TERM_WARNING = (
+    "choice_fn was given without choice_term_in_polish=True. The homophonic "
+    "choice-bits term is a CELL-RANKING device (it penalises verbose decodes); "
+    "inside a fixed-length symbol-map polish it only rewards moving a frequent "
+    "symbol onto a spare letter and it DESTROYED the Borg decipherment "
+    "(SER 0.12 -> 0.31; docs/race_polish_plan.md section 7). Polish on the ELBO "
+    "alone (choice_fn=None); pass choice_term_in_polish=True only to reproduce "
+    "the recorded Phase-5/6 behaviour."
+)
+
+
+def _check_choice_term(choice_fn, choice_term_in_polish: bool):
+    if choice_fn is not None and not choice_term_in_polish:
+        raise ValueError(CHOICE_TERM_WARNING)
+
+
 def elbo_polish(
     evaluator,
     cipher_ids: np.ndarray,
@@ -296,6 +312,8 @@ def elbo_polish(
     seed: int = 0,
     pair_swaps: bool = True,
     resample_masks: bool = False,
+    set_moves: bool = True,
+    choice_term_in_polish: bool = False,
 ) -> tuple[np.ndarray, dict]:
     """Discrete outer-tier refinement of a symbol→letter map under the frozen
     diffusion evaluator: every single-symbol reassignment (and symbol-pair
@@ -305,11 +323,19 @@ def elbo_polish(
     ``scale.py``); the best move is taken, repeated up to ``sweeps`` times.
     The result is confirmed against the start map at ``confirm_budget``
     (paired) and the start map is returned if it is not better there.
+    ``set_moves=False`` restricts the neighbourhood to pair swaps, which
+    keeps a bijective (1:1) key bijective.
     This is where the ELBO can improve on the n-gram objective's own
     optimum (rung 2: the pentagram's best map is not always the true map
-    at 408 chars; the ELBO prefers the true one)."""
+    at 408 chars; the ELBO prefers the true one).
+
+    ``choice_fn`` is OFF by default and refused unless
+    ``choice_term_in_polish=True``: see ``CHOICE_TERM_WARNING`` — the MDL
+    choice term belongs to the cell ranking, not to the polish objective
+    (finding of 2026-08-25, ``docs/race_polish_plan.md`` §7)."""
     from .two_tier import paired_bits
 
+    _check_choice_term(choice_fn, choice_term_in_polish)
     cipher = np.asarray(cipher_ids, dtype=np.int64)
     n_sym = int(sym_map.shape[0])
     cur = np.asarray(sym_map, dtype=np.int64).copy()
@@ -327,7 +353,7 @@ def elbo_polish(
     for sweep in range(sweeps):
         cands = [cur]
         moves = [None]
-        for s in range(n_sym):
+        for s in range(n_sym if set_moves else 0):
             for letter in range(A):
                 if letter == cur[s]:
                     continue
@@ -373,5 +399,206 @@ def elbo_polish(
         "confirm_mdl": [float(t[0]), float(t[1])],
         "accepted": bool(t[0] < t[1]),
         "n_changed": int((cur != start).sum()),
+    }
+    return (cur if t[0] < t[1] else start), info
+
+
+# -- outer-tier discrete refinement, racing form ----------------------------
+
+
+def _neighbourhood(cur: np.ndarray, *, set_moves: bool, pair_swaps: bool):
+    """Row 0 is the current map; every single-symbol reassignment and
+    symbol-pair letter swap follows (identical to ``elbo_polish``)."""
+    n_sym = int(cur.shape[0])
+    cands, moves = [cur], [None]
+    for s in range(n_sym if set_moves else 0):
+        for letter in range(A):
+            if letter == cur[s]:
+                continue
+            m = cur.copy()
+            m[s] = letter
+            cands.append(m)
+            moves.append(("set", s, letter))
+    if pair_swaps:
+        for s1 in range(n_sym):
+            for s2 in range(s1 + 1, n_sym):
+                if cur[s1] == cur[s2]:
+                    continue
+                m = cur.copy()
+                m[s1], m[s2] = m[s2], m[s1]
+                cands.append(m)
+                moves.append(("swap", s1, s2))
+    return cands, moves
+
+
+def _z_bonferroni(alpha: float, n: int) -> float:
+    from scipy.stats import norm
+
+    return float(norm.isf(alpha / max(n, 1)))
+
+
+def race_polish(
+    evaluator,
+    cipher_ids: np.ndarray,
+    sym_map: np.ndarray,
+    *,
+    language: str,
+    choice_fn=None,
+    sweeps: int = 8,
+    budgets: tuple[int, ...] = (4, 16, 64, 128),
+    max_survivors: tuple[int | None, ...] = (None, 64, 12, 4),
+    alpha: float = 0.05,
+    se_floor_frac: float = 0.5,
+    batch: int = 96,
+    seed: int = 0,
+    pair_swaps: bool = True,
+    set_moves: bool = True,
+    confirm_budget: int = 64,
+    choice_term_in_polish: bool = False,
+) -> tuple[np.ndarray, dict]:
+    """Racing form of :func:`elbo_polish` (``docs/race_polish_plan.md``).
+
+    The greedy polish takes the argmin over ~n_sym·A noisy paired estimates
+    at one small budget and commits it — a winner's-curse selection that
+    at Borg scale degraded the key every sweep. Here every neighbour is
+    screened cheaply on the PAIRED DIFFERENCE to the current map (same
+    masks, so the difference is low-variance and its spread over strata
+    estimates the noise); candidates whose interval says "not an
+    improvement" are eliminated with a Bonferroni-corrected z over the live
+    set; survivors are re-scored with FRESH masks at growing budgets and the
+    non-screen draws pooled; a move is committed only if it is confidently
+    better than the current map on those fresh draws. If nothing qualifies
+    the polish stops — "no real improvement here" is a first-class outcome.
+
+    ``choice_fn`` is refused unless ``choice_term_in_polish=True`` (see
+    ``CHOICE_TERM_WARNING``): with the term in the objective the race still
+    degraded Borg (0.12 → 0.225); on the ELBO alone it held it (0.1194).
+    """
+    from .two_tier import paired_bits, paired_bits_strata
+
+    _check_choice_term(choice_fn, choice_term_in_polish)
+    cipher = np.asarray(cipher_ids, dtype=np.int64)
+    cur = np.asarray(sym_map, dtype=np.int64).copy()
+    start = cur.copy()
+    n_stages = len(budgets)
+    if len(max_survivors) != n_stages:
+        raise ValueError("budgets and max_survivors must have the same length")
+
+    def choice_delta(maps):
+        if choice_fn is None:
+            return np.zeros(len(maps))
+        c0 = choice_fn(maps[0], maps[0][cipher])
+        return np.array([choice_fn(m, m[cipher]) - c0 for m in maps])
+
+    def stats(d):
+        """d: [n_alive, K] per-stratum paired differences (row of the
+        current map excluded). Mean and shrunk standard error."""
+        K = d.shape[1]
+        mean = d.mean(1)
+        se = d.std(1, ddof=1) / np.sqrt(K) if K > 1 else np.full(len(d), np.inf)
+        floor = se_floor_frac * float(np.median(se)) if len(se) else 0.0
+        return mean, np.maximum(se, floor)
+
+    trace = []
+    draws_total = 0
+    for sweep in range(sweeps):
+        cands, moves = _neighbourhood(cur, set_moves=set_moves, pair_swaps=pair_swaps)
+        n_cand = len(cands) - 1
+        if n_cand == 0:
+            break
+        cdelta = choice_delta(cands)  # deterministic MDL choice term per candidate
+        alive = np.arange(1, len(cands))
+        pooled = None  # [n_alive, K_pooled] fresh (non-screen) draws
+        stage_log = []
+        committed = None
+        for stage, (budget, cap) in enumerate(zip(budgets, max_survivors)):
+            rows = np.stack([cands[i][cipher] for i in np.concatenate([[0], alive])])
+            per = paired_bits_strata(
+                evaluator,
+                rows,
+                [language],
+                n_strata=budget,
+                seed=seed + 1009 * stage + 7 * sweep,
+                batch=batch,
+            )[:, 0, :]
+            draws_total += int(rows.shape[0] * budget)
+            # per-stratum values are contributions (already / n_strata); scale
+            # to per-stratum bits so pooled draws across budgets are commensurate
+            d = (per[1:] - per[0:1]) * budget + cdelta[alive][:, None]
+            if stage == 0:
+                mean, se = stats(d)
+            else:
+                pooled = d if pooled is None else np.concatenate([pooled, d], 1)
+                mean, se = stats(pooled)
+            z = _z_bonferroni(alpha, len(alive))
+            keep = (mean - z * se) <= 0  # cannot yet exclude "improvement"
+            order = np.argsort(mean)
+            capped = False
+            if cap is not None and keep.sum() > cap:
+                top = set(order[:cap].tolist())
+                keep = np.array([keep[i] and i in top for i in range(len(alive))])
+                capped = True
+            stage_log.append(
+                {
+                    "stage": stage,
+                    "budget": budget,
+                    "n_alive_in": len(alive),
+                    "n_alive_out": int(keep.sum()),
+                    "z": z,
+                    "capped": capped,
+                    "best_mean": float(mean[order[0]]),
+                    "best_se": float(se[order[0]]),
+                }
+            )
+            # commit test on fresh draws only
+            if stage > 0 and keep.any():
+                zc = _z_bonferroni(alpha, int(keep.sum()))
+                ok = np.where(keep & ((mean + zc * se) < 0))[0]
+                if len(ok):
+                    b = ok[np.argmin(mean[ok])]
+                    committed = (int(alive[b]), float(mean[b]), float(se[b]), zc)
+                    break
+            if not keep.any():
+                break
+            idx = np.where(keep)[0]
+            alive = alive[idx]
+            if pooled is not None:
+                pooled = pooled[idx]
+        entry = {
+            "sweep": sweep,
+            "n_cands": n_cand,
+            "stages": stage_log,
+            "best_move": None,
+            "gain": 0.0,
+        }
+        if committed is None:
+            trace.append(entry)
+            break
+        i, m, s, zc = committed
+        entry.update(
+            best_move=moves[i],
+            gain=float(-m),
+            se=s,
+            z=zc,
+            changed=int((cands[i] != cur).sum()),
+        )
+        trace.append(entry)
+        cur = cands[i]
+    rows = np.stack([cur[cipher], start[cipher]])
+    b = paired_bits(
+        evaluator, rows, [language], n_strata=confirm_budget, seed=seed + 7, batch=batch
+    )[:, 0]
+    cd = choice_delta([start, cur])  # relative to start
+    t = np.array([b[0] + cd[1], b[1] + cd[0]])
+    draws_total += 2 * confirm_budget
+    info = {
+        "method": "race",
+        "trace": trace,
+        "confirm_bits": [float(b[0]), float(b[1])],
+        "confirm_mdl": [float(t[0]), float(t[1])],
+        "accepted": bool(t[0] < t[1]),
+        "n_changed": int((cur != start).sum()),
+        "n_moves": int(sum(1 for e in trace if e["best_move"] is not None)),
+        "draws_total": int(draws_total),
     }
     return (cur if t[0] < t[1] else start), info

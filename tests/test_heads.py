@@ -697,6 +697,7 @@ def test_rung2_pair_polish_and_elbo_polish_toy():
         confirm_budget=2,
         choice_fn=lambda mm, dec: choice_bits("homophonic", dec, sym_to_letter=mm)
         / len(dec),
+        choice_term_in_polish=True,
         pair_swaps=True,
     )
     assert out.shape == (n_sym,) and out.min() >= 0 and out.max() < A

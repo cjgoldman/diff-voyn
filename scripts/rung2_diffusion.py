@@ -360,8 +360,17 @@ def stage_score(args, root):
                 best_so_far.key,
                 language=hyp,
                 seed=seed,
-                choice_fn=lambda m, dec: choice_bits("homophonic", dec, sym_to_letter=m)
-                / max(len(dec), 1),
+                # objective: ELBO alone unless --polish-choice-term (the recorded
+                # Phase-5 runs used the MDL total; see docs/race_polish_plan.md §7)
+                choice_fn=(
+                    (
+                        lambda m, dec: choice_bits("homophonic", dec, sym_to_letter=m)
+                        / max(len(dec), 1)
+                    )
+                    if args.polish_choice_term
+                    else None
+                ),
+                choice_term_in_polish=args.polish_choice_term,
                 sweeps=args.elbo_sweeps,
                 budget=args.elbo_budget,
                 pair_swaps=False,
@@ -619,6 +628,12 @@ def main():
     )
     p.add_argument("--budget", type=int, default=64)
     p.add_argument("--elbo-sweeps", type=int, default=6)
+    p.add_argument(
+        "--polish-choice-term",
+        action="store_true",
+        help="put the MDL choice term in the elbo_polish objective (the recorded "
+        "Phase-5 behaviour; harmful at Borg scale — docs/race_polish_plan.md §7)",
+    )
     p.add_argument("--elbo-budget", type=int, default=8)
     p.add_argument("--refine-steps", type=int, default=20)
     p.add_argument("--refine-lr", type=float, default=0.1)

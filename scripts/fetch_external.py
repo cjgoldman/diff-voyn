@@ -17,6 +17,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from diff_voyn.ciphers.external import (
+    CIPHER_BENCHMARK_SHA,
+    CIPHER_BENCHMARK_SPARSE,
+    CIPHER_BENCHMARK_URL,
+    GUTENBERG_ENGLISH_IDS,
     NAIBBE_SHA,
     NAIBBE_URL,
     VOYNICH_ATTACK_SHA,
@@ -43,6 +47,28 @@ def clone_and_pin(url: str, dest: Path, sha: str) -> None:
         subprocess.run(["git", "-C", str(dest), "checkout", "-q", sha], check=True)
 
 
+def sparse_clone_and_pin(url: str, dest: Path, sha: str, paths) -> None:
+    """Blob-less sparse clone (text directories only) pinned to ``sha``."""
+    if not dest.is_dir():
+        print(f"sparse-cloning {url} -> {dest}")
+        subprocess.run(
+            [
+                "git",
+                "clone",
+                "--quiet",
+                "--filter=blob:none",
+                "--sparse",
+                url,
+                str(dest),
+            ],
+            check=True,
+        )
+        subprocess.run(
+            ["git", "-C", str(dest), "sparse-checkout", "set", *paths], check=True
+        )
+    clone_and_pin(url, dest, sha)
+
+
 def main() -> None:
     root = data_root()
     ext = root / "external"
@@ -57,6 +83,22 @@ def main() -> None:
         if not target.exists():
             print(f"downloading voynich.nu/data/{name}")
             urllib.request.urlretrieve(f"http://www.voynich.nu/data/{name}", target)
+    # Phase 6 anchors (task 6.6)
+    sparse_clone_and_pin(
+        CIPHER_BENCHMARK_URL,
+        ext / "cipher_benchmark",
+        CIPHER_BENCHMARK_SHA,
+        CIPHER_BENCHMARK_SPARSE,
+    )
+    eng = root / "raw" / "anchors" / "english"
+    eng.mkdir(parents=True, exist_ok=True)
+    for gid in GUTENBERG_ENGLISH_IDS:
+        target = eng / f"pg{gid}.txt"
+        if not target.exists():
+            print(f"downloading gutenberg pg{gid}.txt")
+            urllib.request.urlretrieve(
+                f"https://www.gutenberg.org/cache/epub/{gid}/pg{gid}.txt", target
+            )
     print("external artifacts ready")
 
 

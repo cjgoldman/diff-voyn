@@ -38,6 +38,7 @@ from ..vocab import LETTER_IDS, MASK_ID, NULL_ID, VOCAB_SIZE
 from .evaluator import EvaluatorBase, TokenEmission
 from .frame import build_frame, letters_to_vocab
 from .ngram import A
+from .two_tier import condition_index
 
 LETTER_BASE = LETTER_IDS[0]
 
@@ -185,7 +186,7 @@ class DiffusionEvaluator(EvaluatorBase):
                 continue
             B = m.shape[0]
             z = torch.where(m[:, :, None], mask_onehot[None, None, :], frame[None])
-            lang = torch.full((B,), LANG_TO_INDEX[language], device=self.device)
+            lang = torch.full((B,), condition_index(language), device=self.device)
             with torch.autocast("cuda", dtype=torch.bfloat16, enabled=self.autocast):
                 logits = self.backbone.forward_soft(z, lang)
             logq = torch.log_softmax(logits.float(), dim=-1)  # (B, S, V)

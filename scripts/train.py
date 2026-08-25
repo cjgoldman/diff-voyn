@@ -247,6 +247,16 @@ def parse_args() -> argparse.Namespace:
         help="example-kind probabilities (default NoiseConfig: 0.5 0.3 0.1 0.1)",
     )
     p.add_argument(
+        "--noise-families",
+        nargs="+",
+        choices=["substitution", "segmentation", "transcription"],
+        default=None,
+        help="phase_b ablation (control experiment 6a): restrict the noise "
+        "families to this subset (default: all three). E.g. "
+        "'--noise-families segmentation transcription' re-runs the curriculum "
+        "WITHOUT the wrong-key family",
+    )
+    p.add_argument(
         "--no-eval-raw",
         action="store_true",
         help="skip the raw-weight canary (EMA-only, as in the original Phase A)",
@@ -445,6 +455,22 @@ def main() -> None:
     noise_cfg: NoiseConfig | None = None
     if args.phase in ("phase_b", "phase_c") and not args.no_noise:
         noise_cfg = NoiseConfig(*args.noise_mix) if args.noise_mix else NoiseConfig()
+        if args.noise_families is not None:
+            fams = set(args.noise_families)
+            noise_cfg = NoiseConfig(
+                **{
+                    **noise_cfg.to_dict(),
+                    "p_substitution": noise_cfg.p_substitution
+                    if "substitution" in fams
+                    else 0.0,
+                    "p_segmentation": noise_cfg.p_segmentation
+                    if "segmentation" in fams
+                    else 0.0,
+                    "p_transcription": noise_cfg.p_transcription
+                    if "transcription" in fams
+                    else 0.0,
+                }
+            )
     run_dir = root / "runs" / cfg.run_name
     run_dir.mkdir(parents=True, exist_ok=True)
 
@@ -644,7 +670,12 @@ def main() -> None:
             root,
             tags=[args.model, PHASE_TAGS[args.phase]]
             + (["resume"] if args.resume else [])
-            + (["no-noise"] if args.no_noise else []),
+            + (["no-noise"] if args.no_noise else [])
+            + (
+                ["families:" + "+".join(sorted(args.noise_families))]
+                if args.noise_families
+                else []
+            ),
         )
         task.connect_configuration(schedule_info, name="schedule")
         if phase_c:
