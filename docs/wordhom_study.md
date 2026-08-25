@@ -140,9 +140,105 @@ type in Currier A and 4.6 in Currier B (74 % / 69 % hapax types). Runs at
 the threshold (5–6 tokens per type) and at the manuscript's own shape
 (A-like 10.8k tokens / 3.6k types, B-like 23k / 5k) follow in §3.2.
 
-## 4. Controls
+## 4. Controls through the diffusion pipeline
 
-_(pending)_
+Every control is a `wordtypesall` instance through the identical pipeline
+(2 restarts × 2M steps, paired ELBO, MDL selection, 16 × 1024-char
+windows × 4 seeds with shuffled copies). Positives are the synthetic
+cipher of §2.2 at three shapes: **findable** (8000 letters, ~940 types,
+8.3 tokens per type — inside the recoverable regime of §3.1), **A-like**
+(14 000 letters, ~3 270 types, 4.1–4.2 tokens per type) and **B-like**
+(30 000 letters, ~5 240 types, 5.5–5.6); a fourth set at 6.7 tokens per
+type (`t0`, 1 300 homophones requested) landed in the degraded regime by
+mis-sizing and is kept as the intermediate point. Negatives: letter-shuffled
+text under the same cipher, `voynichesque` word tokens presented directly
+as word types, and out-of-inventory contamination (Dutch, English, French,
+Spanish under the cipher with the document's own top-5 doubled letters).
+`analysis/wordhom/report.{json,md}`:
+
+| instance | tokens / type | own-language plaintext bits/char | own structure margin | letter SER (own hypothesis) | abstain | MDL-top language |
+|---|---|---|---|---|---|---|
+| positive German findable | 8.3 | **1.941** | **2.27** | **0.008** | **no — called German** | German |
+| positive Italian findable | 8.3 | 2.702 | 1.44 | 0.040 | yes (rule: margin < 1.5) | Italian |
+| positive Latin findable | 8.3 | 3.303 | 0.38 | 0.606 | yes | German |
+| positive German t0 | 6.6 | 3.175 | 0.61 | 0.425 | yes | German |
+| positive Italian t0 | 6.7 | 3.366 | 0.51 | 0.421 | yes | German |
+| positive Latin t0 | 6.8 | 3.397 | 0.35 | 0.674 | yes | German |
+| positive German A-like | 4.1 | 3.311 | 0.49 | 0.642 | yes | German |
+| positive Italian A-like | 4.2 | 3.418 | 0.38 | 0.768 | yes | German |
+| positive Latin A-like | 4.2 | 3.429 | 0.34 | 0.769 | yes | German |
+| positive German B-like | 5.5 | 3.653 | 0.27 | 0.690 | yes | Latin |
+| positive Italian B-like | 5.6 | 3.723 | 0.23 | 0.775 | yes | Latin |
+| positive Latin B-like | 5.6 | 3.674 | 0.23 | 0.780 | yes | Italian |
+| shuffled (3) | 6.6–6.8 | 3.45–3.59 | 0.20–0.23 | 0.77–0.78 | yes | — |
+| voynichesque (3) | 2.6–3.2 | 3.28–3.34 (best hyp) | 0.48–0.64 | — | yes | — |
+| contamination (4) | 6–7 | — | 0.31–0.45 | — | yes | German ×3, Italian ×1 |
+
+Reading:
+
+* **The manuscript's cells are indistinguishable from true ciphers of its
+  shape.** The A-like positives (4.1–4.2 tokens per type) give plaintext
+  3.31–3.43 bits/char and margins 0.34–0.49; Currier A (3.0) gives
+  3.31–3.37 and 0.47–0.50. The B-like positives (5.5–5.6) give 3.65–3.72
+  and 0.23–0.27; Currier B (4.6) gives 3.66–3.71 and 0.19–0.24. Same
+  numbers, same abstention, same failed map (letter SER 0.64–0.78 where the
+  truth is known).
+* **Below the threshold the structure margin carries no cipher signal.**
+  Shuffled text under the cipher (0.20–0.23) and the B-like positives
+  (0.23–0.27) overlap; `voynichesque` gibberish (0.48–0.64) is *above* every
+  A-like positive. The margin that separated true from false decipherments
+  by ≥ 1.26 bits in Phase 6 is a property of *found* keys; an unfound
+  word-level key produces a decode whose residual structure is whatever
+  the frequent types happen to carry.
+* **The language call is meaningless at this ratio**: 0/9 positives are
+  called (all abstain, as they should) and the MDL-top language is right
+  for 2/9 — German is the MDL favourite for 6 of the 9 positives and 3 of
+  the 4 contaminations, the "drift to German" of the n-gram judges
+  (`docs/ngram_judge_robustness.md`) reappearing because the inner search
+  is the n-gram objective.
+
+### 4.1 The findable positives: the pipeline works when the key is findable
+
+At 8.3 tokens per type the identical pipeline recovers the German key
+(letter SER 0.008), decodes at 1.94 bits/char with a structure margin of
+2.27 — inside the Phase-6 true-decipherment band (1.49–2.48) — and *calls*
+German; it recovers the Italian key (SER 0.040, margin 1.44) and abstains
+only because the frozen rule's margin threshold is 1.5 (Phase 6 had the
+same borderline case at 1.49); it misses the Latin key with 2 restarts
+(SER 0.61, margin 0.38) — Latin is the hard language for the n-gram inner
+search at every rung (`docs/phase5_status.md`), and here as there the fix
+is restarts, not the objective. So the instrument is sound: a word-level
+homophonic cipher whose vocabulary is rich enough per type is found,
+scored as language and named. What it cannot do is find one at the
+manuscript's 3–5 tokens per type, and no positive at that ratio (6/6) got
+above a margin of 0.49.
+
+## 6. Conclusion
+
+Answer to the question that started this (can the arithmetic be bypassed
+by brute-forcing the tokens, given letters + the top-5 doubled letters and
+the repeat rule?): **not at the manuscript's vocabulary statistics.** The
+hypothesis passes a real consistency check — with the doubled letters as
+extra characters, Latin and German text would show repeated tokens at
+about the manuscript's rate (§2.1) — and the machinery to test it exists
+and works (§4.1). But an unstructured word-level homophonic key is
+identifiable from the ciphertext alone only above ~8 tokens per type;
+Currier A has 3.0 and B has 4.6, three-quarters of the types are hapaxes,
+and a true cipher of that shape comes through the pipeline with exactly
+the manuscript's numbers (plaintext 3.3–3.7 bits/char, margin 0.2–0.5,
+hundreds of rule violations, letter SER 0.6–0.8 where truth is known).
+The manuscript's 12 cells all abstain and its MDL total sits 0.09–0.43
+bits/char above the stream's own n-gram description, but that abstention
+is uninformative: it is what the pipeline says about any cipher of this
+shape. Boxer's arithmetic — or some other compact key rule that makes the
+rare types cost nothing — is not a detail of his demonstration; it is the
+part that would make the hypothesis testable, and it is the part a
+decipherment claim has to supply. Two ways forward if one wanted to push:
+(a) a structured-key head (targets as a function of a token's glyph
+composition, rung-3 style), which turns 3.6k free parameters into a few
+hundred and moves the instance above the threshold; (b) a much larger
+restart budget on the manuscript only makes sense once (a) exists.
+
 
 ## 5. The manuscript
 
