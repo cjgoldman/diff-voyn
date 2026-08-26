@@ -98,3 +98,88 @@ def test_key_bits_and_jobs():
     # eva instances never get the word head
     inst["kind"] = "eva"
     assert not [j for j in make_jobs(inst, heads=(WORDHOM,)) if j["head"] == WORDHOM]
+
+
+# -- incremental objective (wordhom_state) -----------------------------------
+
+
+def _toy_evaluator():
+    from diff_voyn.heads.evaluator import NgramEvaluator
+    from diff_voyn.heads.ngram import train_lm
+
+    rng = np.random.default_rng(0)
+    # a stream with structure so that the pentagram table is non-trivial
+    stream = (rng.integers(0, 8, size=20_000) + (np.arange(20_000) % 3)) % A
+    lm = train_lm("toy", [stream.astype(np.uint8)], k_max=5)
+    return NgramEvaluator({"toy": lm})
+
+
+def test_incremental_state_matches_full_objective():
+    from diff_voyn.heads.wordhom import WordHomophonicHead
+    from diff_voyn.heads.wordhom_state import WordHomObjectiveState
+
+    ev = _toy_evaluator()
+    t = UnitTargets(((0, 0), (3, 3), (5, 5)))
+    hd = WordHomophonicHead(ev, targets=t, seed=0)
+    rng = np.random.default_rng(3)
+    n_sym, n_tok = 120, 1500
+    # Zipf-ish symbol stream: heavy and singleton types, some in tokens 0..3
+    w = 1.0 / np.arange(1, n_sym + 1)
+    symbols = rng.choice(n_sym, size=n_tok, p=w / w.sum())
+    token_pos = np.cumsum(rng.random(n_tok) < 0.9)  # some non-adjacent pairs
+    adj = adjacency(symbols, token_pos)
+    key = rng.integers(0, t.n, size=n_sym)
+    st = WordHomObjectiveState(hd, symbols, adj, key, "toy", t)
+    full = lambda m: hd.objective(m, symbols, adj, "toy", t)
+    assert st.score == pytest.approx(full(key), abs=1e-3)
+    occ = np.bincount(symbols, minlength=n_sym)
+    heavy = int(np.argmax(occ))
+    early = [int(s) for s in symbols[:4]]
+    for it in range(300):
+        if it < 4:
+            syms, units = np.array([early[it]]), rng.integers(t.n, size=1)
+        elif it < 12:
+            syms, units = np.array([heavy]), rng.integers(t.n, size=1)
+        elif rng.random() < 0.8:
+            syms, units = rng.choice(n_sym, size=1), rng.integers(t.n, size=1)
+        else:  # the SA's swap move
+            syms = rng.choice(n_sym, size=2, replace=False)
+            units = np.array([st.sym_map[syms[1]], st.sym_map[syms[0]]])
+        d = st.delta(syms, units)
+        m2 = st.sym_map.copy()
+        m2[syms] = units
+        assert d == pytest.approx(full(m2) - full(st.sym_map), abs=2e-3)
+        if rng.random() < 0.5:
+            assert st.commit(syms, units) == pytest.approx(full(st.sym_map), abs=2e-3)
+    for s in [heavy, *early, *rng.choice(n_sym, size=4).tolist()]:
+        d = st.deltas_all(s)
+        base = full(st.sym_map)
+        for u in range(t.n):
+            m2 = st.sym_map.copy()
+            m2[s] = u
+            assert d[u] == pytest.approx(full(m2) - base, abs=2e-3), (s, u)
+        assert d[st.sym_map[s]] == 0.0
+
+
+def test_polish_and_sa_use_incremental_state_and_return_full_score():
+    from diff_voyn.heads.wordhom import WordHomophonicHead
+
+    ev = _toy_evaluator()
+    t = UnitTargets(((0, 0), (3, 3)))
+    hd = WordHomophonicHead(ev, targets=t, seed=0)
+    rng = np.random.default_rng(5)
+    symbols = rng.integers(0, 40, size=600)
+    adj = adjacency(symbols, None)
+    key = rng.integers(0, t.n, size=40)
+    m, sc, _ = hd.polish(symbols, adj, key, "toy", t)
+    assert sc == pytest.approx(hd.objective(m, symbols, adj, "toy", t), abs=1e-6)
+    assert sc >= hd.objective(key, symbols, adj, "toy", t)
+    # a local optimum: no single reassignment improves
+    for s in range(40):
+        for u in range(t.n):
+            m2 = m.copy()
+            m2[s] = u
+            assert hd.objective(m2, symbols, adj, "toy", t) <= sc + 1e-6
+    m2, sc2, _ = hd.sa_phase(symbols, adj, key.copy(), "toy", t, rng, steps=2000)
+    assert sc2 == pytest.approx(hd.objective(m2, symbols, adj, "toy", t), abs=1e-6)
+    assert sc2 >= hd.objective(key, symbols, adj, "toy", t)

@@ -320,39 +320,17 @@ class WordHomophonicHead:
         """SA over single-symbol reassignments (occurrence-weighted
         proposals so frequent types are visited often) + greedy polish;
         returns the best map visited."""
+        from .wordhom_state import WordHomObjectiveState
+
         n_symbols = len(sym_map)
         occ = np.bincount(symbols, minlength=n_symbols).astype(float)
         p_prop = (occ + 1.0) / (occ + 1.0).sum()
-        score = self.objective(sym_map, symbols, adj, language, targets)
-        best_map, best = sym_map.copy(), score
-        n_evals = 1
-        for step in range(steps):
-            t = t_start * (t_end / t_start) ** (step / max(steps - 1, 1))
-            if rng.random() < 0.9:
-                s = rng.choice(n_symbols, p=p_prop)
-                old = sym_map[s]
-                new = rng.integers(targets.n)
-                if new == old:
-                    continue
-                sym_map[s] = new
-                undo = [(s, old)]
-            else:
-                s1, s2 = rng.choice(n_symbols, size=2, p=p_prop)
-                if sym_map[s1] == sym_map[s2]:
-                    continue
-                undo = [(s1, sym_map[s1]), (s2, sym_map[s2])]
-                sym_map[s1], sym_map[s2] = sym_map[s2], sym_map[s1]
-            cand = self.objective(sym_map, symbols, adj, language, targets)
-            n_evals += 1
-            if cand > score or rng.random() < np.exp((cand - score) / t):
-                score = cand
-                if score > best:
-                    best_map, best = sym_map.copy(), score
-            else:
-                for s, old in undo:
-                    sym_map[s] = old
+        cdf = np.cumsum(p_prop)
+        cdf[-1] = 1.0
+        st = WordHomObjectiveState(self, symbols, adj, sym_map, language, targets)
+        best_map, _, n_evals = st.sa(rng, steps, t_start, t_end, cdf)
         sym_map, score, n2 = self.polish(symbols, adj, best_map, language, targets)
-        return sym_map, score, n_evals + n2
+        return sym_map, score, n_evals + 1 + n2
 
     def polish(
         self,
@@ -363,28 +341,17 @@ class WordHomophonicHead:
         targets: UnitTargets,
         max_sweeps: int = 20,
     ) -> tuple[np.ndarray, float, int]:
-        """Greedy single-symbol reassignment sweeps until no move improves."""
-        sym_map = sym_map.copy()
-        n_symbols = len(sym_map)
+        """Greedy single-symbol reassignment sweeps until no move improves
+        (best-improvement per symbol, deltas from the incremental state).
+        The returned score is the full objective recomputed once, so a
+        caller comparing it against ``objective()`` sees no drift."""
+        from .wordhom_state import WordHomObjectiveState
+
+        st = WordHomObjectiveState(self, symbols, adj, sym_map, language, targets)
+        _, n_evals = st.polish(max_sweeps)
+        sym_map = st.sym_map.copy()
         score = self.objective(sym_map, symbols, adj, language, targets)
-        n_evals = 1
-        for _ in range(max_sweeps):
-            improved = False
-            for s in range(n_symbols):
-                cur = sym_map[s]
-                for u in range(targets.n):
-                    if u == cur:
-                        continue
-                    sym_map[s] = u
-                    sc = self.objective(sym_map, symbols, adj, language, targets)
-                    n_evals += 1
-                    if sc > score + 1e-9:
-                        score, cur, improved = sc, u, True
-                    else:
-                        sym_map[s] = cur
-            if not improved:
-                break
-        return sym_map, score, n_evals
+        return sym_map, score, n_evals + 1
 
     # -- EM initializer (Baum-Welch decipherment, rung-3 lineage) ------------
 
