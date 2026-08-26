@@ -197,7 +197,16 @@ def alternate(
                 prop[i], prop[j] = cur[j], cur[i]
                 info["reseeded"].append((int(i), int(cur[i]), int(cur[j]), round(g, 3)))
             if not sw:
-                info["seconds"] = time.time() - t0
+                info.update(
+                    obj_proposed=cur_obj,
+                    obj_after_sa=cur_obj,
+                    obj_out=cur_obj,
+                    accepted=False,
+                    n_changed_by_proposer=0,
+                    n_changed_by_sa=0,
+                    n_changed_total=0,
+                    seconds=time.time() - t0,
+                )
                 trace.append(info)
                 if on_round:
                     on_round(info)
