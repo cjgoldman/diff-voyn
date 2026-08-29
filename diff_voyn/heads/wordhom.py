@@ -244,6 +244,10 @@ class WordHomophonicHead:
         self.repeat_weight = repeat_weight
         self.seed = seed
         self._prior: dict[str, np.ndarray] = {}
+        # optional (n_symbols,) bool: "wildcard" types whose letters are
+        # charged a constant and reset the n-gram context (hapax study);
+        # frozen out of SA/polish proposals
+        self.wild_types: np.ndarray | None = None
 
     def targets_for(self, language: str) -> UnitTargets:
         return self.targets or language_targets(self.ev, language, self.n_bigrams)
@@ -263,6 +267,14 @@ class WordHomophonicHead:
         language: str,
         targets: UnitTargets,
     ) -> float:
+        if self.wild_types is not None:
+            from .wordhom_state import WordHomObjectiveState
+
+            return float(
+                WordHomObjectiveState(
+                    self, symbols, adj, sym_map, language, targets
+                ).score
+            )
         units = sym_map[symbols]
         letters = expand_units(units, targets)
         ll = self.ev.score_hard(letters, language=language, order=self.rescore_order)
@@ -324,7 +336,10 @@ class WordHomophonicHead:
 
         n_symbols = len(sym_map)
         occ = np.bincount(symbols, minlength=n_symbols).astype(float)
-        p_prop = (occ + 1.0) / (occ + 1.0).sum()
+        p_prop = occ + 1.0
+        if self.wild_types is not None:
+            p_prop[np.asarray(self.wild_types, dtype=bool)] = 0.0
+        p_prop = p_prop / p_prop.sum()
         cdf = np.cumsum(p_prop)
         cdf[-1] = 1.0
         st = WordHomObjectiveState(self, symbols, adj, sym_map, language, targets)

@@ -70,7 +70,11 @@ R2_DEEP = [
     ("german", 1, 15, "deep"),
 ]
 WH_CELLS = [("positive/german/t0", "german"), ("positive/italian/t0", "italian")]
-WH_STRETCH = [("positive/german/Alike", "german")]
+WH_STRETCH = [
+    ("positive/german/Alike", "german"),
+    ("positive/italian/Alike", "italian"),
+    ("positive/latin/Alike", "latin"),
+]
 
 
 def log_to(path):
@@ -167,9 +171,59 @@ class WHCell:
         self.ev = ev
         self.args = args
         self.occ = np.bincount(self.symbols, minlength=self.n_sym)
+        # hapax-masking proposer (arms ``*-hm``): letter positions of types
+        # with <= hapax_max occurrences are withheld from the denoiser
+        self.hapax_mask = False
+        # no-hapax proposer (arms ``*-nh``): rare types never enter the
+        # disagreement set (their score row is -inf → no finite margin)
+        self.drop_hapax = False
+        self.rare_type = self.occ <= args.hapax_max
+        self.rare_tok = self.rare_type[self.symbols]
+        self.wild = None
+        # --wild: hapax types are wildcards in the n-gram objective
+        # (docs/alt_loop_plan.md §8.4) — frozen out of SA and proposals
+        if getattr(args, "wild", False):
+            self.set_wild(self.rare_type)
+            self.drop_hapax = True
+
+    def set_wild(self, mask):
+        """Current wildcard set: charged a constant in the n-gram objective,
+        frozen out of SA/polish and (``drop_hapax``) of the proposals."""
+        self.wild = np.asarray(mask, dtype=bool)
+        self.head.wild_types = self.wild if self.wild.any() else None
+
+    def wild_schedule(self, start, end, seed):
+        """§8.6 anneal: from round ``start`` to ``end`` the hapax types are
+        re-admitted to the objective (and to the search) in equal batches,
+        in a fixed seeded random order, so the objective is the wildcard one
+        before ``start`` and the standard one from ``end`` on. Returns the
+        ``schedule`` callable for :func:`alternate` (a dict on the rounds
+        where the set shrinks, None otherwise)."""
+        rare = np.flatnonzero(self.rare_type)
+        order = np.random.default_rng(seed).permutation(rare)
+        n_steps = end - start + 1
+
+        def schedule(r):
+            if r < start or r > end + 1:
+                return None
+            frac = min(1.0, (r - start + 1) / n_steps) if r <= end else 1.0
+            n_admit = round(frac * len(order))
+            mask = self.rare_type.copy()
+            mask[order[:n_admit]] = False
+            if r > start and int(mask.sum()) == int(self.wild.sum()):
+                return None
+            self.set_wild(mask)
+            return {"n_wild": int(mask.sum()), "n_admitted": n_admit}
+
+        return schedule
 
     def decode(self, m):
         return expand_units(m[self.symbols], self.targets)
+
+    def rare_positions(self, m):
+        """(L,) bool over the decode's letter positions: emitted by a rare type."""
+        isbig = self.targets.second[m[self.symbols]] >= 0
+        return np.repeat(self.rare_tok, 1 + isbig)
 
     def objective(self, m):
         return self.head.objective(m, self.symbols, self.adj, self.lang, self.targets)
@@ -189,18 +243,31 @@ class WHCell:
         return out, sc
 
     def scores(self, m):
+        dec = self.decode(m)
         P = position_posterior(
             self.ev,
-            self.decode(m),
+            dec,
             self.lang,
             n_draws=self.args.n_draws,
             mask_rate=self.args.mask_rate,
             seed=self.args.seed,
+            force_mask=self.rare_positions(m) if self.hapax_mask else None,
+            force_rate=self.args.hapax_mask_rate,
         )
-        return unit_scores(P, self.symbols, m, self.targets)
+        S = unit_scores(P, self.symbols, m, self.targets)
+        if self.drop_hapax:
+            S[self.wild if self.wild is not None else self.rare_type] = -np.inf
+        return S
 
     def wrong(self, m):
         return m != self.true_map
+
+    def judge_bits(self, m, seed):
+        return float(
+            self.ev.score_stream(
+                self.decode(m), language=self.lang, n_strata=64, seed=seed
+            )
+        )
 
     def random_unit(self, s, cur, rng):
         if cur < A:
@@ -306,6 +373,21 @@ ARMS = {
     "post-all": ("posterior", None),
     "psamp-k8": ("posterior_sample", 8),
     "psamp-all": ("posterior_sample", None),
+    # small-commitment arms (docs/alt_loop_plan.md §9): commit the 1-2
+    # most-supported symbols per round, re-read the posterior, repeat
+    "post-k1": ("posterior", 1),
+    "psamp-k1": ("posterior_sample", 1),
+    "psamp-k2": ("posterior_sample", 2),
+    "psamp-k64": ("posterior_sample", 64),
+    "rand-k2": ("random", 2),
+    # hapax-masked variants (wordhom cells only): rare types' letters are
+    # withheld from the denoiser before the posterior is read
+    "post-all-hm": ("posterior", None),
+    "psamp-all-hm": ("posterior_sample", None),
+    "post-k8-hm": ("posterior", 8),
+    # no-hapax variants: rare types are dropped from the proposal set
+    "post-all-nh": ("posterior", None),
+    "psamp-all-nh": ("posterior_sample", None),
     "rand-k8": ("random", 8),
     "rand-k512": ("random", 512),
     "none": ("none", None),
@@ -322,12 +404,24 @@ def stage_run(args, cells, log, out_dir):
             mech, k = ARMS[arm]
             if mech == "race" and c.tag == "wh":
                 continue
+            if c.tag == "wh":
+                c.hapax_mask = arm.endswith("-hm")
+                c.drop_hapax = arm.endswith("-nh") or bool(args.wild)
+            elif arm.endswith(("-hm", "-nh")):
+                continue
             for start_name in ("stuck", "null"):
+                if start_name == "null" and args.no_null:
+                    continue
                 if start_name == "null" and arm not in (
+                    "psamp-k1",
                     "post-k8",
                     "post-all",
                     "rand-k8",
                     "rand-k512",
+                    "post-all-hm",
+                    "psamp-all-hm",
+                    "post-all-nh",
+                    "psamp-all-nh",
                 ):
                     continue
                 for seed in range(args.seeds):
@@ -335,6 +429,47 @@ def stage_run(args, cells, log, out_dir):
                     if key in done:
                         continue
                     start = c.true_map if start_name == "null" else c.start
+                    if args.start_from:
+                        prev = json.loads(
+                            (out_dir / f"runs{args.start_from}.json").read_text()
+                        )
+                        pv = next(
+                            (
+                                r
+                                for r in prev
+                                if r["cell"] == c.name
+                                and r["seed"] == seed
+                                and r["start"] == start_name
+                                and "final_map" in r
+                            ),
+                            None,
+                        )
+                        if pv is None:
+                            log(
+                                f"{c.name} {arm} {start_name} s{seed}: no final_map in runs{args.start_from}.json, skipped"
+                            )
+                            continue
+                        start = np.asarray(pv["final_map"], dtype=np.int64)
+                    accept_fn = None
+                    if args.judge_accept is not None:
+                        margin = args.judge_accept
+
+                        def accept_fn(cur, new, r, c=c, margin=margin, seed=seed):
+                            s_ = (
+                                7919 * (seed + 1) + r
+                            )  # CRN within a round, fresh masks across rounds
+                            b_cur = c.judge_bits(cur, s_)
+                            b_new = c.judge_bits(new, s_)
+                            return b_new < b_cur - margin, {
+                                "bits_cur": b_cur,
+                                "bits_new": b_new,
+                            }
+
+                    schedule = None
+                    if args.wild and args.wild_anneal and c.tag == "wh":
+                        c.set_wild(c.rare_type)  # the schedule mutates it
+                        a0, a1 = args.wild_anneal
+                        schedule = c.wild_schedule(a0, a1, args.seed + 101 * seed)
                     t0 = time.time()
                     _, info = alternate(
                         start,
@@ -350,7 +485,10 @@ def stage_run(args, cells, log, out_dir):
                         ),
                         k=k,
                         rounds=args.rounds,
+                        patience=args.patience,
                         seed=args.seed + 101 * seed,
+                        accept_fn=accept_fn,
+                        schedule=schedule,
                     )
                     rec = {
                         "cell": c.name,
@@ -412,8 +550,41 @@ def main():
     p.add_argument("--seeds", type=int, default=2)
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--rounds", type=int, default=6)
+    p.add_argument("--patience", type=int, default=2)
     p.add_argument("--n-draws", type=int, default=16)
     p.add_argument("--mask-rate", type=float, default=0.3)
+    p.add_argument(
+        "--hapax-max",
+        type=int,
+        default=1,
+        help="-hm arms: mask types with <= this many occurrences",
+    )
+    p.add_argument(
+        "--hapax-mask-rate",
+        type=float,
+        default=1.0,
+        help="-hm arms: per-draw probability a rare position is masked",
+    )
+    p.add_argument("--no-null", action="store_true")
+    p.add_argument("--wild", action="store_true")
+    p.add_argument(
+        "--wild-anneal",
+        type=lambda v: tuple(int(x) for x in v.split(",")),
+        default=None,
+        help="START,END rounds over which the wildcard (hapax) set is re-admitted "
+        "to the objective in equal batches (docs/alt_loop_plan.md §8.6)",
+    )
+    p.add_argument(
+        "--start-from",
+        default=None,
+        help="tag of a runs file whose final_map seeds the start",
+    )
+    p.add_argument(
+        "--judge-accept",
+        type=float,
+        default=None,
+        help="accept a round iff the frozen judge's bits/char drop by more than this margin (CRN-paired)",
+    )
     p.add_argument("--r2-sa-steps", type=int, default=50_000)
     p.add_argument("--wh-sa-steps", type=int, default=200_000)
     p.add_argument("--t-start", type=float, default=2.0)

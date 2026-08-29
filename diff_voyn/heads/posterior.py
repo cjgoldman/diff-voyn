@@ -32,12 +32,21 @@ def position_posterior(
     n_draws: int = 16,
     mask_rate: float = 0.3,
     seed: int = 0,
+    force_mask: np.ndarray | None = None,
+    force_rate: float = 1.0,
 ) -> np.ndarray:
     """(L, A) mean log-posterior over letters at every position of the hard
     letter stream ``letters`` (ids 0..A-1), averaged over ``n_draws``
     independent masks at rate ``mask_rate``; positions never masked get a
     uniform row. Windows longer than the evaluator's context are scored in
-    the evaluator's own tiling."""
+    the evaluator's own tiling.
+
+    ``force_mask`` (L,) bool marks positions that are additionally masked in
+    every draw with probability ``force_rate`` (1.0 = always): the letters
+    the current key assigns there are *withheld* from the denoiser instead
+    of being offered as context — the hapax-masking variant of the proposer
+    (types seen once carry no n-gram evidence, so their current letters are
+    noise the judge should not condition on)."""
     from .two_tier import condition_index
 
     ids = np.asarray(letters, dtype=np.int64)
@@ -52,9 +61,18 @@ def position_posterior(
     mask_onehot[MASK_ID] = 1.0
     letter_ids = torch.tensor(LETTER_IDS, device=evaluator.device)
     bs = getattr(evaluator, "stratum_batch", 16)
+    force = None
+    if force_mask is not None:
+        force = torch.from_numpy(np.asarray(force_mask, dtype=bool))
+        assert force.shape == (L,), (force.shape, L)
     for a, b in evaluator._windows(L):
         S = b - a
         masks = torch.rand(n_draws, S, generator=g) < mask_rate
+        if force is not None:
+            f = force[a:b][None].expand(n_draws, S)
+            if force_rate < 1.0:
+                f = f & (torch.rand(n_draws, S, generator=g) < force_rate)
+            masks = masks | f
         masks = masks.to(evaluator.device)
         for i in range(0, n_draws, bs):
             m = masks[i : i + bs]

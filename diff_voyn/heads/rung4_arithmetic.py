@@ -49,6 +49,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import torch
+from numba import njit
 
 from .ngram import A
 
@@ -707,18 +708,33 @@ class ArithmeticHead:
 # -- alignment metric --------------------------------------------------------
 
 
+@njit(cache=True, nogil=True)
+def _levenshtein(decoded, truth):
+    n, m = len(decoded), len(truth)
+    prev = np.arange(m + 1)
+    cur = np.empty(m + 1, dtype=np.int64)
+    for i in range(1, n + 1):
+        cur[0] = i
+        d = decoded[i - 1]
+        for j in range(1, m + 1):
+            sub = prev[j - 1] + (d != truth[j - 1])
+            best = prev[j] + 1
+            best = min(best, cur[j - 1] + 1)
+            best = min(best, sub)
+            cur[j] = best
+        prev, cur = cur, prev
+    return prev[m]
+
+
 def levenshtein_ser(decoded: np.ndarray, truth: np.ndarray) -> float:
     """Edit-distance error rate — decoded length may differ from the truth
-    when the inferred segmentation splits/merges tokens."""
+    when the inferred segmentation splits/merges tokens. Compiled (numba):
+    the O(n·m) DP in Python took ~38 s on a 7.7k-letter decode and was the
+    dominant term of an alternating-loop round (called twice per round by
+    the metrics)."""
     n, m = len(decoded), len(truth)
     if m == 0:
         return float(n > 0)
-    prev = np.arange(m + 1)
-    for i in range(1, n + 1):
-        cur = np.empty(m + 1, dtype=np.int64)
-        cur[0] = i
-        sub = prev[:-1] + (decoded[i - 1] != truth)
-        for j in range(1, m + 1):
-            cur[j] = min(prev[j] + 1, cur[j - 1] + 1, sub[j - 1])
-        prev = cur
-    return float(prev[m]) / m
+    d = np.ascontiguousarray(np.asarray(decoded, dtype=np.int64))
+    t = np.ascontiguousarray(np.asarray(truth, dtype=np.int64))
+    return float(_levenshtein(d, t)) / m

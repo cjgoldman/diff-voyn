@@ -273,3 +273,87 @@ per cell. The sub1to1 pid-file waiter never fired because the `uv run`
 wrapper lingers as a `<defunct>` zombie that `kill -0` still accepts —
 launch by hand or wait on the python child pid. One crash fixed mid-run
 (empty pair-swap proposal left the round record incomplete; `a1d82dd`).
+
+## 13. The wildcard → anneal pipeline on the wordhom cells (2026-08-28/29)
+
+The synthetic A-like word-homophonic traps that §12's loop could not leave
+were broken afterwards by two additions (`docs/alt_loop_plan.md` §8.4–8.6):
+the hapax-as-wildcard n-gram objective (rare types charged a constant, frozen
+out of SA and proposals, so the frequent types converge on their own
+context) and a schedule that re-admits the wildcards in batches once the
+frequent types have converged. On synthetic A-like cells that pipeline takes
+the loop from SER 0.6–0.7 to 0.05 (German, **called** under the frozen
+rule), 0.07 (Latin) and 0.12 (Italian). This section runs the same pipeline
+on the 12 manuscript wordhom cells of §12 — the natural question after §12,
+since those cells are the regime (3.0 / 4.6 tokens per type, 69–75 % hapax
+types) the synthetic traps were built to imitate.
+
+**Setup** (`scripts/altloop_vms.py --wild --hapax-max 1`, `--wild-anneal
+0,40 --start-from`, `--tag`, `--arms`; records carry the wildcard
+provenance, the report groups by head + tag, tiers read on any treatment
+arm). Same 12 cells, same n-gram MDL-pick start keys, same §4 metrics and §5
+tiers; arms `none`, `rand` (k = 512), **`post`** (posterior argmax over the
+whole disagreement set — the `post-all` arm the synthetic study ran on) and
+`psamp`; 2 seeds. Stage 1: wildcard objective, ≤ 96 rounds, patience 10
+(2 698 / 3 647 IT2a-A types wild; 2 800 / 3 735 RF1b-A; 3 481 / 5 045 and
+3 700 / 5 343 on B). Stage 2, from every stage-1 final key: anneal 0–40,
+≤ 80 rounds, patience 10, ending on the standard objective. 192 runs, ~13 s
+per round (numba inner search), ~9 h on two GPUs. Artifacts
+`analysis/altloop_vms/runs_wordhom_{wild,anneal}.json` (merged from the
+per-GPU files in `pergpu/`), `report.md` sections `wordhom_wild` /
+`wordhom_anneal`, logs `nohup_wild_{it2a,rf1b}.out`.
+
+**Result: 24 / 24 (cell × stage) NOISE; nothing reaches NOTABLE.**
+
+| stage | none (final margin, 2 seeds) | rand | post | psamp | best treatment round vs best control |
+|---|---|---|---|---|---|
+| wildcard (A cells) | 0.29–0.32 | 0.11–0.23 | 0.13–0.20 | 0.14–0.23 | −0.07 … −0.13 on every cell |
+| wildcard (B cells) | 0.26–0.29 | 0.11–0.22 | 0.09–0.16 | 0.10–0.16 | −0.11 … −0.14 |
+| anneal (A cells) | 0.50–0.54 | 0.47–0.52 | 0.40–0.51 | 0.41–0.51 | −0.01 … −0.08 |
+| anneal (B cells) | 0.37–0.43 | 0.36–0.43 | 0.31–0.37 | 0.30–0.37 | −0.02 … −0.07 |
+
+Plain bits: 3.66–3.91 under the wildcard objective, 3.30–3.53 after the
+anneal (Phase-6 starts 3.29–3.42). Language ranking of every treatment final
+is the cell's own hypothesis or a 0.000–0.005-bit flip to German/Latin,
+against calibration uncertainty 0.067–0.193 — noise, as in §12.
+
+What happened, in order:
+
+1. **The wildcard stage does not converge on anything.** On the synthetic
+   traps the frequent types re-organise over 30–90 rounds; here every
+   treatment run accepts 1–11 rounds (mostly the first, where the objective
+   change itself is the "improvement") and then rejects 10 in a row —
+   median 13 rounds. Freezing the hapaxes leaves 950 (A) / 1 560 (B)
+   frequent types carrying 74–85 % of the tokens, and the judge's posterior
+   over their letters gives the SA nothing it wants. The structure margin
+   *drops* under the wildcard objective (0.49 → 0.10–0.20) because the
+   frozen hapax letters — a quarter of the A-stream letters — are whatever
+   the standard optimum left them, now unconstrained by any n-gram.
+2. **The anneal puts everything back.** Re-admitting the hapaxes restores
+   plain bits and margin to the Phase-6 start values on every arm including
+   `none` (0.51–0.54 on A, where the start was 0.49–0.52; 0.37–0.43 on B vs
+   0.36–0.40). The treatment arms end *below* the `none` control on all
+   12 cells (−0.01 … −0.08), the German cells consistently lowest — the same
+   "n-gram refit lowers the margin" direction §12 and Phase 6 recorded.
+3. **The pipeline lands in a different, slightly worse n-gram basin.** The
+   anneal finals differ from the Phase-6 start key on 90–95 % of types and
+   sit 0–1 300 nats *below* it on the standard objective (47 / 48 treatment
+   runs; one +300). On the synthetic cells the same route ends 1–2 k nats
+   *above* the trap it started from. So the mechanism that breaks the
+   synthetic traps — frequent-type context strong enough to set the hapaxes
+   right once they are handed back — has no purchase here: the manuscript's
+   frequent-type optimum is not a trap around a better key the loop can
+   reach, it is (as far as this search can tell) the optimum.
+
+Reading against the plan: §1's second row again — `post ≈ psamp ≤ rand ≤
+none` on every cell and stage, so the method is blind on the manuscript
+even with the additions that made it work on the synthetic A-like battery.
+This strengthens rather than weakens the §12 statement: the synthetic
+battery now *does* cover a regime where the loop demonstrably recovers a
+key at 3 tokens per type with 74 % hapaxes, and the manuscript cells do not
+behave like it. The Phase-6 abstention stands. Nothing here is a
+decipherment claim in either direction; the remaining honest next step is
+unchanged (§11: judge in the acceptance rule with the choice term off, and
+a manuscript-shaped *negative* battery — voynichesque and wrong-language
+streams at these token statistics — to learn what the 0.3–0.5 margin band
+looks like when there is nothing to find).

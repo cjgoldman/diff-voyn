@@ -54,6 +54,7 @@ def _scan(
     tokll,
     n_tok,
     adj,
+    wild,
     out_tok,
     out_val,
 ):
@@ -67,6 +68,7 @@ def _scan(
     n_out = 0
     n_ch = ch_sym.shape[0]
     buf = np.empty(2 * (2 * CTX + 1), np.int64)
+    wbuf = np.zeros(2 * (2 * CTX + 1), np.int64)
     start = np.empty(2 * CTX + 2, np.int64)  # letter index where token k starts
     for j in range(n_pos):
         p = pos[j]
@@ -87,9 +89,11 @@ def _scan(
                     break
             start[t - lo] = n
             buf[n] = first[u]
+            wbuf[n] = wild[t]
             n += 1
             if second[u] >= 0:
                 buf[n] = second[u]
+                wbuf[n] = wild[t]
                 n += 1
         start[hi - lo + 1] = n
         for t in range(p, hi + 1):
@@ -97,9 +101,17 @@ def _scan(
             for q in range(start[t - lo], start[t - lo + 1]):
                 # absolute position: q itself when the buffer starts at
                 # token 0, otherwise ≥ 4 letters of history are present
+                # wildcard letter: constant charge (0); letters after a
+                # wildcard back off to the context that starts past it
+                if wbuf[q]:
+                    continue
                 k = 5
                 if lo == 0 and q + 1 < 5:
                     k = q + 1
+                for r in range(q - 1, q - k, -1):
+                    if wbuf[r]:
+                        k = q - r
+                        break
                 code = 0
                 for r in range(q - k + 1, q):
                     code = code * A + buf[r]
@@ -204,6 +216,8 @@ def _sa_run(
     tab_off,
     tokll,
     adj,
+    wild,
+    wild_sym,
     cnt,
     log_prior,
     state,
@@ -239,7 +253,7 @@ def _sa_run(
         if np.random.random() < 0.9:
             s = np.searchsorted(cdf, np.random.random())
             new = np.random.randint(n_units)
-            if new == sym_map[s]:
+            if new == sym_map[s] or wild_sym[s]:
                 continue
             n_ch = 1
             ch_sym[0] = s
@@ -248,7 +262,7 @@ def _sa_run(
         else:
             s1 = np.searchsorted(cdf, np.random.random())
             s2 = np.searchsorted(cdf, np.random.random())
-            if sym_map[s1] == sym_map[s2]:
+            if sym_map[s1] == sym_map[s2] or wild_sym[s1] or wild_sym[s2]:
                 continue
             n_ch = 2
             ch_sym[0] = s1
@@ -275,6 +289,7 @@ def _sa_run(
             tokll,
             n_tok,
             adj,
+            wild,
             out_tok,
             out_val,
         )
@@ -347,6 +362,8 @@ def _polish_run(
     tab_off,
     tokll,
     adj,
+    wild,
+    wild_sym,
     cnt,
     log_prior,
     state,
@@ -370,6 +387,8 @@ def _polish_run(
     for _ in range(max_sweeps):
         improved = False
         for s in range(n_sym):
+            if wild_sym[s]:
+                continue
             cur = sym_map[s]
             pos = occ_idx[occ_ptr[s] : occ_ptr[s + 1]]
             ch_sym[0] = s
@@ -393,6 +412,7 @@ def _polish_run(
                     tokll,
                     n_tok,
                     adj,
+                    wild,
                     out_tok,
                     out_val,
                 )
@@ -451,6 +471,7 @@ def _polish_run(
                     tokll,
                     n_tok,
                     adj,
+                    wild,
                     out_tok,
                     out_val,
                 )
@@ -505,6 +526,13 @@ class WordHomObjectiveState:
         if len(self.adj) < len(self.symbols):  # pad so adj[n_tok-1] is addressable
             self.adj = np.concatenate([self.adj, np.zeros(1, dtype=bool)])
         self.sym_map = np.asarray(sym_map, dtype=np.int64).copy()
+        wt = getattr(head, "wild_types", None)
+        self.wild_sym = (
+            np.zeros(len(self.sym_map), dtype=np.int64)
+            if wt is None
+            else np.asarray(wt, dtype=bool).astype(np.int64)
+        )
+        self.wild = self.wild_sym[self.symbols]
         self.language = language
         self.targets = targets
         self.first = targets.first
@@ -567,6 +595,7 @@ class WordHomObjectiveState:
             self.tokll,
             self.n_tok,
             self.adj,
+            self.wild,
             self._out_tok,
             self._out_val,
         )
@@ -679,6 +708,8 @@ class WordHomObjectiveState:
             self.tab_off,
             self.tokll,
             self.adj,
+            self.wild,
+            self.wild_sym,
             self.cnt,
             self.log_prior,
             state,
@@ -710,6 +741,8 @@ class WordHomObjectiveState:
             self.tab_off,
             self.tokll,
             self.adj,
+            self.wild,
+            self.wild_sym,
             self.cnt,
             self.log_prior,
             state,

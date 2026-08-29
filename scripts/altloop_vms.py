@@ -54,6 +54,7 @@ ARMS = {
     "wordhom": {
         "none": ("none", None),
         "rand": ("random", 512),
+        "post": ("posterior", None),
         "psamp": ("posterior_sample", None),
     },
     "homophonic": {
@@ -68,6 +69,14 @@ ARMS = {
     },
 }
 ARM_ORDER = ("none", "rand", "psamp")  # controls first: the gate reads on the spot
+CONTROLS = ("none", "rand")
+
+
+def is_treatment(arm: str) -> bool:
+    """Judge-driven arms (post/psamp) — the ones the §5 tiers are read on."""
+    return arm not in CONTROLS
+
+
 RUN_KEY = ("cell", "arm", "seed")
 INSTANCES = ("IT2a/A", "RF1b/A", "IT2a/B", "RF1b/B")  # A before B (§2)
 BOXER = ("boxer20/A", "boxer20/B")
@@ -123,6 +132,14 @@ class Cell:
             self.targets = self.hd.targets_for(self.lang)
             self.n_cipher_window = int(sum(len(t) for t in inst["all_tokens"][a:b]))
             self.key_len = self.n_sym
+            # hapax-as-wildcard objective (docs/alt_loop_plan.md §8.4/8.6):
+            # rare types are charged a constant in the n-gram objective,
+            # frozen out of SA/polish and dropped from the judge's proposals
+            occ = np.bincount(self.symbols, minlength=self.n_sym)
+            self.rare_type = occ <= int(getattr(args, "hapax_max", 1))
+            self.wild = None
+            if getattr(args, "wild", False):
+                self.set_wild(self.rare_type)
         else:
             self.symbols = np.asarray(inst["symbols"][a:b], dtype=np.int64)
             self.n_cipher_window = len(self.symbols)
@@ -143,6 +160,35 @@ class Cell:
         )
         self.occ = np.bincount(self.symbols, minlength=self.key_len)
         self.key_bits = head_key_bits(head, self.n_sym)
+
+    # -- wildcard set (wordhom only) ---------------------------------------
+
+    def set_wild(self, mask):
+        self.wild = np.asarray(mask, dtype=bool)
+        self.hd.wild_types = self.wild if self.wild.any() else None
+
+    def wild_schedule(self, start, end, seed):
+        """§8.6 anneal: rounds ``start..end`` re-admit the rare types to the
+        objective (and the search) in equal batches, seeded random order;
+        standard objective from ``end`` on. Returns ``alternate``'s
+        ``schedule`` callable (a dict on rounds where the set shrinks)."""
+        rare = np.flatnonzero(self.rare_type)
+        order = np.random.default_rng(seed).permutation(rare)
+        n_steps = end - start + 1
+
+        def schedule(r):
+            if r < start or r > end + 1:
+                return None
+            frac = min(1.0, (r - start + 1) / n_steps) if r <= end else 1.0
+            n_admit = round(frac * len(order))
+            mask = self.rare_type.copy()
+            mask[order[:n_admit]] = False
+            if r > start and int(mask.sum()) == int(self.wild.sum()):
+                return None
+            self.set_wild(mask)
+            return {"n_wild": int(mask.sum()), "n_admitted": int(n_admit)}
+
+        return schedule
 
     # -- head interface ------------------------------------------------------
 
@@ -204,7 +250,10 @@ class Cell:
             seed=self.seed,
         )
         if self.head == "wordhom":
-            return unit_scores(P, self.symbols, m, self.targets)
+            S = unit_scores(P, self.symbols, m, self.targets)
+            if self.wild is not None and self.wild.any():
+                S[self.wild] = -np.inf  # wildcards never enter the proposal set
+            return S
         return symbol_scores(P, self.symbols, self.key_len)
 
     def random_unit(self, s, cur, rng):
@@ -537,7 +586,7 @@ class RunState:
             f"acc={info.get('accepted')} chg={info.get('n_changed_total')} "
             f"margin={cur_m['structure_margin']:.3f} plain={cur_m['plain_bits']:.3f} {info['seconds']:.0f}s"
         )
-        if arm != "psamp":
+        if not is_treatment(arm):
             return
         rb = control_best(self.res, c.name, "rand")
         nb = control_best(self.res, c.name, "none")
@@ -579,9 +628,36 @@ class RunState:
             self.rep.sample(f"{tier} {c.name} r{info['round']}", text)
 
 
+def start_key_from(args, c, arm, seed):
+    """``--start-from TAG``: the final key of the same (cell, arm, seed) run
+    in runs_<head><TAG>.json (stage 2 of the wildcard → anneal pipeline)."""
+    path = (
+        data_root() / "analysis/altloop_vms" / f"runs_{args.head}{args.start_from}.json"
+    )
+    prev = json.loads(path.read_text())["runs"]
+    for r in prev:
+        if r["cell"] == c.name and r["arm"] == arm and r["seed"] == seed:
+            return np.asarray(r["final_key"], dtype=np.int64)
+    return None
+
+
 def run_one(args, c, arm, seed, res, rep, log, tier_counts, promising, prom_path):
     mech, k = ARMS[args.head][arm]
     t0 = time.time()
+    if args.start_from:
+        sk = start_key_from(args, c, arm, seed)
+        if sk is None:
+            log(
+                f"{c.name} {arm} s{seed}: no run in runs_{args.head}{args.start_from}.json, skipped"
+            )
+            return None
+        c.start = sk
+    schedule = None
+    if args.wild and c.head == "wordhom":
+        c.set_wild(c.rare_type)  # the schedule mutates it; reset per run
+        if args.wild_anneal:
+            a0, a1 = args.wild_anneal
+            schedule = c.wild_schedule(a0, a1, c.seed + 101 * seed)
     st = RunState(c, arm, seed, res, rep, log, tier_counts, promising, prom_path)
     rep.scalar(
         c.name,
@@ -608,6 +684,7 @@ def run_one(args, c, arm, seed, res, rep, log, tier_counts, promising, prom_path
         patience=args.patience,
         seed=c.seed + 101 * seed,
         on_round=st.on_round,
+        schedule=schedule,
     )
     info["start_metrics"] = st.start_metrics
     # end-of-run reading: all three conditions, 4 scoring seeds (flip-rate)
@@ -624,6 +701,14 @@ def run_one(args, c, arm, seed, res, rep, log, tier_counts, promising, prom_path
     rec = {
         "cell": c.name,
         "head": args.head,
+        "tag": args.tag,
+        "start_from": args.start_from,
+        "wild": bool(args.wild),
+        "hapax_max": int(args.hapax_max),
+        "wild_anneal": list(args.wild_anneal) if args.wild_anneal else None,
+        "n_wild_start": (
+            int(c.rare_type.sum()) if args.wild and c.head == "wordhom" else 0
+        ),
         "instance": c.inst_name,
         "window": c.window,
         "window_span": list(c.span),
@@ -650,7 +735,7 @@ def run_one(args, c, arm, seed, res, rep, log, tier_counts, promising, prom_path
 
 
 def stage_run(args, cells, ng, ev, log, out_dir, config):
-    path = out_dir / f"runs_{args.head}.json"
+    path = out_dir / f"runs_{args.head}{args.tag}.json"
     res = json.loads(path.read_text())["runs"] if path.exists() else []
     done = {tuple(r[k] for k in RUN_KEY) for r in res}
     rep = Reporter(args, out_dir, log, config)
@@ -658,18 +743,20 @@ def stage_run(args, cells, ng, ev, log, out_dir, config):
     promising = json.loads(prom_path.read_text()) if prom_path.exists() else []
     tier_counts = {t: 0 for t in ("NOISE", "NOTABLE", "PROMISING", "LANGUAGE-LIKE")}
     best = max(
-        [r["final_metrics"]["structure_margin"] for r in res if r["arm"] == "psamp"]
+        [r["final_metrics"]["structure_margin"] for r in res if is_treatment(r["arm"])]
         + [-1.0]
     )
     n_done_cells = 0
     for c in cells:
         for seed in range(args.seeds):
-            for arm in ARM_ORDER:
+            for arm in args.arms:
                 if (c.name, arm, seed) in done:
                     continue
                 rec = run_one(
                     args, c, arm, seed, res, rep, log, tier_counts, promising, prom_path
                 )
+                if rec is None:
+                    continue
                 res.append(rec)
                 done.add((c.name, arm, seed))
                 write_json_atomic(
@@ -680,7 +767,7 @@ def stage_run(args, cells, ng, ev, log, out_dir, config):
                         "runs": res,
                     },
                 )
-                if arm == "psamp":
+                if is_treatment(arm):
                     fm = rec["final_metrics"]
                     best = max(best, fm["structure_margin"])
                     rep.summary("best_structure_margin", args.head, best, len(res))
@@ -702,11 +789,11 @@ def stage_run(args, cells, ng, ev, log, out_dir, config):
                 for r in res
                 if r["cell"] == c.name and r["arm"] == a
             ]
-            for a in ARM_ORDER
+            for a in args.arms
         }
         rep.heartbeat(
             f"{c.name} done: "
-            + " ".join(f"{a}={','.join(f'{v:.3f}' for v in fin[a])}" for a in ARM_ORDER)
+            + " ".join(f"{a}={','.join(f'{v:.3f}' for v in fin[a])}" for a in args.arms)
         )
     log(f"== {args.head} complete: {len(res)} runs, {n_done_cells} cells this launch")
 
@@ -740,19 +827,37 @@ def stage_report(out_dir):
     ]
     by_head = {}
     for r in runs:
-        by_head.setdefault(r["head"], {}).setdefault(r["cell"], []).append(r)
+        by_head.setdefault(r["head"] + r.get("tag", ""), {}).setdefault(
+            r["cell"], []
+        ).append(r)
     for head, cells in by_head.items():
+        arms_here = [
+            a
+            for a in ("none", "rand", "post", "psamp")
+            if any(r["arm"] == a for rs in cells.values() for r in rs)
+        ]
+        treat = [a for a in arms_here if is_treatment(a)]
+        r0 = next(iter(cells.values()))[0]
+        wild_note = (
+            f" — wildcard objective (types with ≤ {r0.get('hapax_max')} occurrences, "
+            f"{r0.get('n_wild_start')} wild at start), anneal {r0.get('wild_anneal')}, "
+            f"start-from `{r0.get('start_from')}`"
+            if r0.get("wild")
+            else ""
+        )
         lines += [
-            f"## {head} — {len(cells)} cells",
+            f"## {head} — {len(cells)} cells{wild_note}",
             "",
-            "| cell | start margin / plain | none (final margin per seed) | rand | psamp | psamp best-round margin | Δ psamp − best control | n-gram obj Δ (psamp) | accepted (psamp) | top lang (psamp) | tier |",
-            "|---|---|---|---|---|---|---|---|---|---|---|",
+            "| cell | start margin / plain | none (final margin per seed) | rand | "
+            + " | ".join(treat)
+            + " | treatment best-round margin | Δ treatment − best control | n-gram obj Δ (treatment) | accepted (treatment) | top lang (treatment) | tier |",
+            "|---|---|---|---|" + "---|" * len(treat) + "---|---|---|---|---|---|",
         ]
         n_tier = {}
         for cell, rs in cells.items():
             arms = {
                 a: sorted([r for r in rs if r["arm"] == a], key=lambda r: r["seed"])
-                for a in ARM_ORDER
+                for a in ("none", "rand", "post", "psamp")
             }
             sm = rs[0]["start_metrics"]
 
@@ -764,7 +869,7 @@ def stage_report(out_dir):
                     or "—"
                 )
 
-            ps = arms["psamp"]
+            ps = [r for a in treat for r in arms[a]]
             best_ps = max(
                 [r["final_metrics"]["structure_margin"] for r in ps]
                 + [
@@ -814,7 +919,9 @@ def stage_report(out_dir):
             )
             delta = "—" if cb is None or not ps else f"{best_ps - cb:+.3f}"
             lines.append(
-                f"| {cell} | {sm['structure_margin']:.3f} / {sm['plain_bits']:.3f} | {fin('none')} | {fin('rand')} | {fin('psamp')} | "
+                f"| {cell} | {sm['structure_margin']:.3f} / {sm['plain_bits']:.3f} | {fin('none')} | {fin('rand')} | "
+                + " | ".join(fin(a) for a in treat)
+                + " | "
                 f"{best_ps:.3f} | {delta} | {dobj} | {acc} | {top} | **{tier}** |"
             )
         lines += [
@@ -826,11 +933,11 @@ def stage_report(out_dir):
             r["final_metrics"]["structure_margin"]
             for rs in cells.values()
             for r in rs
-            if r["arm"] == "psamp"
+            if is_treatment(r["arm"])
         ]
         if m_all:
             lines.append(
-                f"psamp final margins: min {min(m_all):.3f}, max {max(m_all):.3f} (manuscript ceiling {REF_VMS_CEILING}, lowest true decipherment {REF_TRUE_MIN}); "
+                f"treatment final margins: min {min(m_all):.3f}, max {max(m_all):.3f} (manuscript ceiling {REF_VMS_CEILING}, lowest true decipherment {REF_TRUE_MIN}); "
                 f"language_like: {sum(r['final_metrics']['language_like'] for rs in cells.values() for r in rs)} of {sum(len(rs) for rs in cells.values())} runs."
             )
             lines.append("")
@@ -861,6 +968,30 @@ def main():
     )
     p.add_argument("--device", default="cuda")
     p.add_argument("--only", nargs="*", default=None)
+    p.add_argument(
+        "--arms",
+        nargs="+",
+        default=list(ARM_ORDER),
+        choices=("none", "rand", "post", "psamp"),
+    )
+    p.add_argument("--tag", default="", help="suffix of runs_<head><tag>.json")
+    p.add_argument(
+        "--wild",
+        action="store_true",
+        help="hapax-as-wildcard n-gram objective (wordhom)",
+    )
+    p.add_argument("--hapax-max", type=int, default=1)
+    p.add_argument(
+        "--wild-anneal",
+        type=lambda v: tuple(int(x) for x in v.split(",")),
+        default=None,
+        help="START,END rounds over which the wildcard set is re-admitted (docs/alt_loop_plan.md §8.6)",
+    )
+    p.add_argument(
+        "--start-from",
+        default=None,
+        help="tag of a runs file whose final_key seeds each (cell, arm, seed)",
+    )
     p.add_argument("--seeds", type=int, default=2)
     p.add_argument("--rounds", type=int, default=6)
     p.add_argument("--patience", type=int, default=2)

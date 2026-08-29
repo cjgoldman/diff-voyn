@@ -304,3 +304,437 @@ what moves the search.
 3. Before any manuscript use: a VMS regression arm (the abstention must not
    move), the wordhom 5.6-tokens-per-type and manuscript-shaped cells
    (§3's WH-5.6 / WH-4, not run), and two seeds on the wordhom cells.
+
+## 8. Hapax-masked proposer on the high-hapax word-homophonic cells (2026-08-26)
+
+**Question.** The proposer reads the denoiser posterior from the decode under
+the current key, so at 3–5 tokens per type the context the judge conditions
+on is mostly the key's guesses for types it has essentially no evidence
+about. Variant: before the posterior read, replace the letter positions
+emitted by *hapax* types (≤ 1 occurrence, `--hapax-max`) with `MASK` in every
+draw (`position_posterior(force_mask=…)`, arms `post-all-hm` /
+`psamp-all-hm` in `scripts/altloop_pol.py`), on top of the usual 30 % random
+masking. The rest of the loop (SA 200k steps T 2.0→0.3, accept on the n-gram
+objective, 6 rounds, patience 2) is unchanged. One seed.
+
+Cells: the two t0 cells (6.6 tok/type, 21 % hapax types = 3 % of tokens) and
+the three A-like positives (4.15 tok/type, 44 % hapax types = 11 % of
+tokens, the manuscript's Currier-A shape). Artifacts
+`analysis/altloop/runs_hm.json`, `run_hm.log`.
+
+| cell (stuck start) | arm | SER start → final | n-gram obj final | accepted | hm − plain (nats) |
+|---|---|---|---|---|---|
+| german/t0 | post-all / **-hm** | 0.425 → 0.027 / 0.028 | −13418 / −13421 | 5/6, 4/6 | −3 |
+| german/t0 | psamp-all / **-hm** | 0.425 → 0.031 / 0.029 | −13433 / −13431 | 3/5, 4/6 | +2 |
+| italian/t0 | post-all / **-hm** | 0.421 → 0.056 / 0.054 | −15616 / −15537 | 6/6, 5/6 | +79 |
+| italian/t0 | psamp-all / **-hm** | 0.421 → 0.073 / 0.053 | −15855 / −15532 | 6/6, 6/6 | +323 |
+| german/Alike | post-all / **-hm** | 0.642 → 0.549 / 0.617 | −31828 / −32538 | 6/6, 4/6 | **−710** |
+| german/Alike | psamp-all / **-hm** | 0.642 → 0.569 / 0.650 | −32132 / −33438 | 4/6, 1/3 | **−1306** |
+| italian/Alike | post-all / **-hm** | 0.759 → 0.756 / 0.697 | −34327 / −33141 | 5/6, 6/6 | **+1187** |
+| italian/Alike | psamp-all / **-hm** | 0.759 → 0.750 / 0.718 | −34683 / −33906 | 5/6, 6/6 | **+777** |
+| latin/Alike | post-all / **-hm** | 0.764 → 0.729 / 0.690 | −34224 / −33604 | 6/6, 5/6 | **+620** |
+| latin/Alike | psamp-all / **-hm** | 0.764 → 0.757 / 0.761 | −35167 / −34858 | 2/4, 3/5 | +309 |
+
+Null starts (truth) under the hm arms drift exactly as under the plain arms
+(german/t0 0.026–0.027, italian/t0 0.044–0.046, german/Alike 0.040–0.044,
+italian/Alike 0.097–0.102, latin/Alike 0.055–0.057): masking a correct key's
+hapax letters does not damage it — the SER a null reaches is the objective's
+own refit of rare types (0.10 on Italian A-like: at 4 tokens per type the
+n-gram optimum is already 2 000 nats and 10 % of letters from the truth).
+
+**Reading.** No effect where hapaxes are 3 % of tokens (t0, as expected).
+On the 11 %-hapax A-like cells the sign is language-dependent: masking
+helps Italian on both proposers and Latin on the argmax proposer (+0.6–1.2k
+nats, −0.03–0.06 SER) and hurts German on both (−0.7–1.3k nats, +0.07–0.08
+SER, fewer accepted rounds). The magnitude is the same as the plain
+argmax-vs-sample proposer gap on the same cell (0.3–1.3k nats), i.e. one
+seed cannot separate it from proposer noise, and no variant moves an A-like
+cell out of its trap: every final key sits at SER 0.55–0.76 with 120–220
+rule violations and 9–11k nats above the truth-basin optimum the null rows
+reach. Withholding the hapax guesses removes bad context but also removes
+11 % of the letters the denoiser needs for the *non*-hapax positions, and
+the two effects roughly cancel. **Not adopted**; the code stays as an
+option (`force_mask`, `--hapax-max`, `--hapax-mask-rate`) for a partial-mask
+sweep if the loop is ever run with the judge in the acceptance rule, which
+remains the only change these traps are expected to respond to (§7.7).
+
+### 8.1 Why: the judge's proposals are hapax-heavy but not hapax-discriminating
+
+Per-occurrence-class split of the disagreement set at the A-like stuck
+starts (plain proposer): hapax types are ~48 % of every proposal set (44 %
+of types, 11 % of tokens) and the per-type flag rate falls with occurrence
+(≈ .68 hapax → .64 occ 2–3 → .50 occ 4+). But on hapaxes the rate on
+*wrong* types (.64–.72) barely exceeds that on *right* ones (.38–.55) — a
+one-occurrence posterior row is noise — while frequent types are separated
+(.42–.59 vs .32–.38). At the true key 81–91 % of the false alarms are
+hapaxes. Hapax masking raises the flag rate ~.10 in every class including
+correct frequent types and enlarges the false-alarm set at the truth
+(86 → 158, 171 → 232): it is a larger, noisier kick, not a sharper judge.
+German's judge separates hapaxes best (.72 vs .38; 5 % false alarms at the
+truth) and Italian's worst (.64 vs .53; 29 %), which is the one language
+asymmetry in the data.
+
+### 8.2 Dropping hapax types from the proposal set (`-nh` arms)
+
+Follow-up: types with ≤ 1 occurrence are excluded from the disagreement
+set (`post-all-nh` / `psamp-all-nh`; score rows set to −inf), posterior
+unchanged. Same cells, seed, SA.
+
+| cell (stuck) | proposer | plain | hapax-masked (hm) | no-hapax (nh) |
+|---|---|---|---|---|
+| german/t0 | post / psamp | 0.027 −13418 / 0.031 −13433 | 0.028 −13421 / 0.029 −13431 | 0.027 −13419 / 0.030 −13429 |
+| italian/t0 | post / psamp | 0.056 −15616 / 0.073 −15855 | 0.054 −15537 / 0.053 −15532 | 0.054 −15548 / 0.054 −15585 |
+| german/Alike | post / psamp | **0.549 −31828** / **0.569 −32132** | 0.617 −32538 / 0.650 −33438 | 0.599 −32193 / 0.608 −32718 |
+| italian/Alike | post / psamp | 0.756 −34327 / 0.750 −34683 | **0.697 −33141** / **0.718 −33906** | 0.753 −34230 / 0.752 −34973 |
+| latin/Alike | post / psamp | 0.729 −34224 / 0.757 −35167 | **0.690 −33604** / 0.761 −34858 | 0.752 −34864 / 0.739 −35153 |
+
+Null starts under `-nh`: 0.025–0.026 (german/t0), 0.044–0.045, 0.040–0.041,
+0.100–0.102, 0.054 — unchanged.
+
+Dropping the hapax proposals changes nothing on t0 and never beats the
+plain proposer on the A-like cells (German: worse than plain, better than
+hm; Italian/Latin: equal to plain, i.e. the hm gain there did *not* come
+from suppressing hapax noise). Taken with §8.1: the hapax entries are
+noise the SA repairs at no cost (removing them buys nothing), and what
+moved Italian/Latin under masking was the larger perturbation of the
+frequent types, which the German start (shallower, better-judged) cannot
+absorb. Neither variant is adopted; the recommendation stands — the lever
+is the acceptance rule (judge in the loop), not the proposal set.
+
+### 8.3 Hapax-only masking (2026-08-27, `runs_hm0.json`)
+
+Same `-hm` arms with `--mask-rate 0`: only hapax positions are blanked, so
+the proposal set is the hapax types read against full non-hapax context.
+A-like stuck starts, one seed, 6 rounds (post / psamp, nats):
+
+| cell | plain | hm (hapax + 30 %) | hm0 (hapax only) |
+|---|---|---|---|
+| German | −31 828 / −32 132 | −32 538 / −33 438 | −31 847 / −31 779 |
+| Italian | −34 327 / −34 683 | −33 141 / −33 906 | −34 379 / −34 421 |
+| Latin | −34 224 / −35 167 | −33 604 / −34 858 | −34 461 / −34 391 |
+
+The German penalty under `-hm` was the 30 % general mask, not the hapax
+mask (hm0 matches the best plain arm, 6/6 rounds accepted); the
+Italian/Latin gain under `-hm` disappears (it was the larger kick). SER
+0.61–0.76 everywhere: harmless, not a trap-breaker.
+
+### 8.4 Hapax types as wildcards in the *objective* (2026-08-27)
+
+At the A-like stuck starts the wrong-rate of a type is monotone in its
+occurrence count (hapax 0.87–0.94, ≥ 30 occurrences 0.49–0.75; t0: 0.73–0.76
+vs 0.30–0.37). A hapax type is a free parameter the SA sets after the fact
+to patch its neighbours' n-grams — 44 % of the A-like key. Test:
+`WordHomophonicHead.wild_types` (`wordhom_state.py`: a wildcard letter is
+charged a constant and resets the n-gram context for the letters after it;
+wildcard types are frozen out of SA/polish proposals), driven by
+`scripts/hapax_wildcard.py` (`--no-wild` = same SA under the standard
+objective), 1M SA steps, 3 seeds, artifacts `hapax_wildcard{,_nowild}.json`.
+
+Gap truth − stuck, standard / wildcard objective (nats): t0 German +4 838 /
++4 605, Italian +3 210 / +3 189; A-like German +11 990 / +8 823, Italian
++11 535 / +8 999, Latin +13 356 / +9 825. The hapax "fudge" is ~25 % of the
+A-like gap; the frequent types alone still prefer the trap by 9–10k.
+
+SA from the stuck start (SER per seed): **German t0 escapes under the
+wildcard objective — 0.055, 0.052, 0.394 vs 0.417, 0.422, 0.409 standard; from
+a cold `frequency_init` 0.050/0.050/0.055 vs 0.456/0.520/0.507** (non-hapax
+map error 0.02–0.03; the reachable truth with hapaxes frozen has SER 0.025).
+This is the cell the posterior loop took to 0.027 with the judge; the
+wildcard objective gets there with n-grams alone. Italian t0 (0.41 both) and
+all three A-like cells (0.61–0.76 both; cold 0.52–0.75) do not move. Truth
+starts stay in their basin under both (wildcard 0.13–0.19 on A-like vs
+standard 0.07–0.15, the frozen-hapax cost). Reading: a sound, free objective
+change that reshapes the landscape enough to unstick one t0 trap, not a
+route across the A-like regime, where the frequent types are themselves
+mostly wrong.
+
+**In the alternating loop** (`altloop_pol.py --wild`, `runs_wild.json`; stuck
+start, 6 rounds, one seed; SER, post-all / psamp-all): Italian t0 0.066 / 0.067
+(plain 0.047–0.056 / 0.073, same basin); German A-like **0.482** / 0.577 (plain
+0.549 / 0.569); Italian A-like **0.714 / 0.709** (0.756 / 0.750); Latin A-like
+**0.661** / 0.765 (0.729 / 0.757). First movement on the A-like cells — the
+argmax proposer gains 0.04–0.07 SER on all three and keeps accepting (5–6/6
+rounds) — but 0.48–0.71 is far from the reachable truth (~0.10); one seed, six
+rounds: a lead for a longer run, not a result.
+
+**32 rounds, 3 seeds, patience 6** (`runs_wild32.json`, `post-all --wild`, A-like
+stuck starts; SER per seed): German **0.132 / 0.134 / 0.134** (17/29, 19/32,
+14/20 rounds accepted; objective −23 253…−23 268 vs the truth's −23 464);
+Italian 0.268 / 0.237 / 0.246 (26–28/32 accepted, still descending at the
+cap); Latin **0.173** / 0.661 (stalled, 4/12) / **0.183**. Five of nine runs
+reach the frequent-type truth basin (reachable-truth SER ~0.10) from the
+n-gram trap that every previous arm left untouched; the descent is gradual
+(German s0: 0.64 → 0.48 over rounds 0–4, then 0.40 → 0.27 → 0.17 at rounds
+8–10 as the disagreement set halves, flat at 0.13 from round 13). The
+six-round runs above stopped exactly where the descent accelerates. A
+96-round / patience-10 continuation for Italian and Latin is `runs_wild96.json`.
+
+**96 rounds, patience 10** (`runs_wild96.json`, Italian and Latin, 3 seeds; SER,
+rounds run / accepted): Italian **0.206 / 0.227 / 0.235** (78/45, 51/33, 51/31;
+objectives −25 981…−26 421 vs the truth's ≈ −26 390); Latin **0.173 / 0.171 /
+0.174** (41/21, 52/23, 56/29; −25 161…−25 178 vs ≈ −25 400). Every one of the
+nine A-like (cell × seed) runs now converges from the trap: German 0.13,
+Latin 0.17, Italian 0.21–0.24, all at or above the truth's own wildcard
+objective. The Latin seed that stalled at patience 6 (0.661) converges at
+patience 10 — the slow early phase needs ~10 rejected rounds tolerated. The
+residual above the reachable truth (~0.10) is an objective-level trap the
+wildcard n-gram score prefers to the truth by 0–400 nats; resolving it needs
+the judge in the acceptance rule.
+
+### 8.5 The judge in the acceptance rule, on the residual (2026-08-28)
+
+Prerequisite holds: the frozen judge prefers the reachable truth (hapaxes
+frozen at the stuck assignment) to every converged wildcard key — Italian
+3.24 vs 3.34–3.39 bits/char, Latin 3.03 vs 3.15–3.17 (CRN seed noise ≈ 0.01;
+one 13.7k-char `score_stream` call = 15 s). Aside: frozen wrong hapaxes (11 %
+of tokens) cost the judge 0.86 bits/char (German reach-truth 2.75 vs truth
+1.89).
+
+`altloop_pol.py --judge-accept 0.005 --start-from _wild96` (accept iff the
+judge's bits/char drop by the margin, CRN-paired within a round, fresh masks
+across rounds; `alternate(accept_fn=…)`), from the converged keys, seed 0,
+`runs_judge{,_shortsa}.json`: Italian 0.206 → 0.204 (5/18 accepted) / 0.205
+with a 10k-step inner SA; Latin 0.173 → 0.172 (1/9) / 0.173 (0/8). **No
+gain.** Every candidate returns from the SA (+ greedy polish) with
+essentially all re-seeded symbols rewritten (`sa_changed ≈ reseed`), i.e.
+another key of the same n-gram basin within ±0.01 bits/char, so the judge
+only arbitrates noise. The raw proposals themselves lower the judge's bits
+(Italian 3.35 → 3.31–3.33, Latin 3.15 → 3.11) with SER flat or worse
+(0.208–0.219 / 0.168–0.173): the judge's per-symbol argmax on the residual
+~150–450 disagreeing types is not truth-directed either, so a judge-only
+loop would collect a 0.03-bit self-consistent optimum, not the 0.10–0.15
+gap to the truth. The residual 0.13–0.24 SER is not reachable by either
+objective's single-symbol moves from here.
+
+### 8.6 Annealing the wildcard set (2026-08-28)
+
+§8.4 treats the hapax types as a binary switch: charged a constant, frozen
+out of every proposal, for the whole run. That is what breaks the A-like
+traps, but it also pins 44 % of the key at the *stuck* assignment for
+ever — the reachable-truth ceiling (SER ≈ 0.10, judge cost 0.86 bits/char
+on German, §8.5) is the price of never re-admitting them. The obvious
+continuation is a schedule: once the frequent types have converged, hand
+the hapaxes back to the objective a batch at a time so the now-correct
+context can set them, ending on the standard objective.
+
+Implementation: `alternate(schedule=…)` (`heads/altloop.py`) calls
+`schedule(r)` at the start of each round; when the wildcard set changes
+the incumbent is re-scored under the new objective and the patience
+counter restarts. `WHCell.wild_schedule(start, end, seed)`
+(`scripts/altloop_pol.py --wild-anneal START,END`) re-admits the hapax
+types in equal batches over rounds `start..end` in a seeded random order;
+re-admitted types are scored normally and re-enter the SA, polish and
+posterior proposals. Runs, from the converged `_wild96` keys (Italian /
+Latin A-like, `post-all`, 3 seeds, patience 10, ≤ 80 rounds):
+`--wild-anneal 0,40` (tag `_anneal`) against the instant-switch control
+`--wild-anneal 0,0` (tag `_anneal0`, standard objective from round 0 —
+"does the standard objective just fall back into the trap?").
+
+Pre-registered reading: the anneal is worth adopting iff its final SER
+beats both the `_wild96` endpoint (0.206/0.227/0.235 Italian, 0.173/0.171/
+0.174 Latin) and the instant switch on ≥ 5 of 6 (cell × seed) runs; a tie
+with the instant switch means the schedule is irrelevant and the gain (if
+any) is the re-admission itself; a loss on both means the standard
+objective's basin at these keys is the §8.4 trap and the hapaxes must stay
+wild.
+
+**Results** (`runs_anneal{,0}.json`, SER per seed; standard objective in
+nats, higher is better):
+
+| cell | `_wild96` start | instant switch `_anneal0` | anneal 0–40 `_anneal` |
+|---|---|---|---|
+| Italian A-like | 0.206 / 0.227 / 0.235 | 0.129 / 0.135 / 0.150 (obj −26 045 / −26 045 / −26 332; 22–49 rounds) | **0.119 / 0.122 / 0.121** (−25 944 / −25 924 / −25 894; 64–80 rounds, 45–50 accepted) |
+| Latin A-like | 0.173 / 0.171 / 0.174 | 0.068 / 0.074 / 0.072 (−24 563 / −24 581 / −24 598; 28–59 rounds) | **0.069 / 0.066 / 0.073** (−24 536 / −24 520 / −24 591; 52–78 rounds, 42–47 accepted) |
+| German A-like (from `_wild32map`, 0.132 / 0.134 / 0.134) | 0.132 / 0.134 / 0.134 | 0.050 / 0.048 / 0.052 (−22 422 / −22 436 / −22 448; 23–40 rounds) | 0.050 / 0.049 / 0.048 (−22 430 / −22 428 / −22 449; 59–68 rounds, 43–47 accepted) |
+
+Three things, in order of size:
+
+1. **Re-admitting the hapaxes is the gain.** Handing the frozen types back
+   to the standard objective from the converged wildcard key does *not*
+   fall back into the §8.4 trap: the instant switch alone takes Italian
+   0.21–0.24 → 0.13–0.15 and Latin 0.17 → 0.07, i.e. through the
+   "reachable truth with hapaxes frozen" ceiling (~0.10) that bounded §8.4.
+   Most of it lands in the first five rounds (Italian s0 0.206 → 0.161 on
+   the first re-scored round, 0.13 by round 5). The frequent types the
+   wildcard objective fixed carry enough context to set the hapaxes right
+   — the reverse of the trap, where wrong hapaxes patched wrong neighbours.
+   The judge agrees: the final keys score 2.73–2.83 (Italian) / 2.38–2.41
+   (Latin) bits/char against 3.34–3.39 / 3.15–3.17 for the wildcard keys
+   (§8.5), a drop of ~0.6–0.8 bits/char that is the §8.5 "frozen wrong
+   hapaxes" cost being paid back.
+2. **The schedule beats the switch, narrowly, 5/6** (pre-registered
+   criterion met): Italian 0.119–0.122 vs 0.129–0.150 on all three seeds,
+   by 100–440 nats of the standard objective as well; Latin 0.066/0.073 vs
+   0.074/0.072 on two seeds and 0.069 vs 0.068 on the third — the Latin
+   difference is inside seed noise (≈ 0.005), the Italian one is not. The
+   anneal's advantage is variance: the instant switch lands on a different
+   basin per seed (Italian 0.129–0.150, obj spread 290 nats) where the
+   anneal converges to the same place (0.119–0.122, spread 50 nats). The
+   anneal is also slower — it keeps accepting through the whole 40-round
+   window (42–50 accepted) and needs 52–80 rounds vs 22–59.
+3. **Where it stops is again the objective, not the search.** The final
+   standard objectives (Italian −25 894…−26 045, Latin −24 520…−24 598) sit
+   1 000–1 900 nats *above* the truth's own standard objective (−27 813 /
+   −25 633, `hapax_wildcard_nowild.json`): the standard n-gram objective
+   prefers these SER-0.07–0.12 keys to the truth by a wide margin, so no
+   proposer acting under it can get closer. This is the same statement as
+   §8.4–8.5 one level down: the wildcard objective's trap was 0–400 nats
+   below the truth; the standard objective's is 1–2k nats above it. The
+   residual (map error 0.07–0.12 by occurrence) is the n-gram fudge the
+   wildcard objective was built to remove, now re-admitted; the judge in
+   the acceptance rule (§8.5) is the only instrument that could arbitrate
+   it, and §8.5 found its single-symbol moves are not truth-directed at
+   this SER either.
+
+**German (added 2026-08-28, `runs_anneal{,0}_de.json`; the `_wild32`
+keys had no `final_map`, regenerated as `_wild32map` seeds 1–2: 0.134 /
+0.134).** Same picture, with the two arms now indistinguishable: instant
+switch 0.048–0.052, anneal 0.048–0.050, seed noise ≈ 0.003; both go through
+the German reachable-truth ceiling (0.097 with hapaxes frozen), judge
+2.06–2.07 bits/char against the truth's 1.89 (wildcard keys were 2.75),
+and the standard objective at the found keys (−22 422…−22 449) is again
+~600 nats above the truth's (−23 052). Across the three languages the
+schedule-vs-switch tally is 5/9 with the German and Latin differences
+inside noise; the schedule's only demonstrated edge is Italian, where the
+instant switch scatters across basins. Re-admission is the result, the
+schedule is a variance reducer.
+
+Adopted as the default continuation of a wildcard run: `--wild
+--wild-anneal 0,40 --patience 10 --rounds 80` from the converged wildcard
+key (or, from a stuck start, a wildcard phase to convergence followed by
+the anneal). Final A-like state of the wildcard-then-re-admit pipeline from the
+stuck starts: German 0.05, Latin 0.07, Italian 0.12 — each the standard
+n-gram objective's own optimum, above the truth by 0.6–1.9k nats.
+
+### 8.7 What the judge says at the loop's residual SER (2026-08-28, `scripts/judge_at_ser.py`, `analysis/altloop/judge_at_ser.{json,md}`)
+
+Question: the wildcard loop leaves the A-like cells at letter SER 0.13 (German) / 0.17 (Latin) / 0.21–0.24 (Italian). Does the frozen Phase-6 judge call the language there? Every key below was pushed through the exact Phase-6 full-stream scoring (13 windows × 4 replicate seeds × 3 language conditions, budget 64, paired letter-shuffled copies, `cell_from_score`, `ABSTAIN_RULE`). Keys per cell: truth, the solve's stuck start, the loop's recorded final maps (`runs_wild96.json`; German re-run once as `runs_wild32map.json`, SER 0.132 as before), and truth corrupted at controlled SER — uniformly over types (`uni@`) and rarest-types-first (`rare@`, the search's own error profile).
+
+| cell | truth: plain / margin / lang margin ± unc | last **called** key | loop's final key (SER) → plain / margin / called |
+|---|---|---|---|
+| German A-like | 1.89 / 2.33 / 0.138 ± 0.067 | rare@ SER 0.084 (margin 1.59); uni@ SER 0.102 sits at exactly 1.50 | 0.132 → 2.83 / **1.40** / no (rank ge>la>it, lang margin 0.086 ± 0.067) |
+| Latin A-like | 2.17 / 1.94 / 0.023 ± 0.067 | uni@ SER 0.039 (margin 1.66); SER 0.056 → 1.47 | 0.17 ×3 → 3.14 / **0.99** / no (rank la>ge>it, lang margin 0.02 ± 0.067) |
+| Italian A-like | 2.60 / **1.56** / 0.022 ± 0.193 | truth only; SER 0.030 → 1.33 | 0.21–0.24 ×3 → 3.34–3.39 / **0.73–0.82** / no (rank it>ge>la, lang margin 0.01 ± 0.193) |
+
+Readings:
+
+1. **The structure margin is a near-linear function of SER and crosses the 1.5 threshold at SER ≈ 0.10 (German), ≈ 0.045 (Latin), and below 0.03 (Italian — the true key itself is at 1.56).** ~0.08–0.09 bits of margin per point of SER on all three cells, uniform and rare-first alike. The loop's residual (0.13–0.24) is therefore 1.3×–8× beyond what the frozen rule will call. Plain bits cross 3.0 at about the same SER (German 0.13, Latin 0.10, Italian 0.05), so both halves of the rule fail together.
+2. **The language *ranking* is right at every SER, but only German's is significant.** The truth language tops all 3 conditions on all 48 non-stuck keys (flip-rate 0 everywhere) — even at SER 0.5. German's language margin stays 0.08–0.15 (uncertainty 0.067) down to SER ≈ 0.3; Latin's is 0.02–0.04 against 0.067 and Italian's 0.01–0.05 against 0.193 at *every* SER including truth, i.e. within calibration uncertainty. On the stuck starts (SER 0.64–0.76) the ranking is German-first for German, Latin-first for both Latin and Italian — the wrong-key drift to a default language, not a signal.
+3. **Error profile barely matters.** At matched SER the rare-first corruption (hapaxes wrong first) scores marginally better than uniform (German SER 0.084 rare → 1.59 vs SER 0.102 uni → 1.50), but the loop's actual final keys sit *on* the synthetic curve (German 0.132 → 1.40 between rare 0.127 → 1.34 and uni 0.152 → 1.20; Latin 0.17 → 0.99 vs rare 0.176 → 0.82 / uni 0.160 → 0.89), slightly above it because the wildcard objective's errors concentrate on rare types. No hidden benignness in the search's errors.
+4. **The Italian A-like cell is not callable even at the true key by a margin of 0.06 bits** — the same shape as the 1.49/1.51 borderline instances in the Phase-6 acceptance. The A-like Italian source text is simply harder for the judge (2.60 bits/char at truth vs 1.89 German, 2.17 Latin), so anything short of a perfect key abstains there.
+
+Consequence: to turn the wildcard loop's A-like results into *calls* the loop must reach SER ≲ 0.08 (German) / ≲ 0.04 (Latin) — the 0–400-nat objective-vs-truth gap noted in §8.4 has to close — or the judge must enter the acceptance rule (§8.5). The ranking signal that survives to SER 0.3 is a weak argument for the latter: the judge sees the right language long before it is willing to say so, but on Latin/Italian that preference is one calibration-uncertainty wide and cannot carry a decision on its own.
+
+## 9. Small-commitment loop (2026-08-26)
+
+**Question.** Image and masked diffusion samplers commit a little per step
+and re-read the denoiser between steps because the x₀ prediction is a
+per-position *marginal*: with many plausible completions it is an average
+over modes, and committing everything at once lands on an inconsistent
+one. §7.1 measured exactly that regime on the badly-wrong keys (the judge
+ranks *which* symbols are wrong above base rate but its argmax letter is
+never right). The §7 arms committed either 8 symbols or the whole
+disagreement set per round and stopped after ≤ 6 rounds (patience 2), so the
+diffusion-faithful regime — commit the 1–2 most-supported symbols, re-read
+the posterior under the new key, repeat for many rounds — was never run.
+This section runs it. No training, no change to the proposer or the
+acceptance rule (still the n-gram objective).
+
+**Arms** (`scripts/altloop_pol.py`, tag `_smallk`): `psamp-k1`, `psamp-k2`,
+`post-k1` (argmax letter, k = 1), against `psamp-k8`, `psamp-all` and the
+size-matched control `rand-k2`, all at **32 rounds, patience 32** (no early
+stop) so every arm gets the same number of posterior reads and SA calls;
+the §7.3 6-round numbers are the second reference. Rung 2: the 8 bank/t5
+cells + 6 deep cells, cold SA (T 0.5→0.2, 20k steps), 2 seeds; null start
+(truth) for `psamp-k1`. Wordhom t0 cells (6.6 tokens/type): `psamp-k8`,
+`psamp-k64`, `psamp-all` at 32 rounds, 1 seed, SA 200k at T 2.0→0.3.
+
+**Pre-registered readings** (fixed before any number was read):
+
+- R9.1 *Deep traps.* The three rung-2 deep cells stuck for every §7.3 arm
+  (latin t0 / t3, italian t0 deep, SER 0.55–0.59) and german t0 deep: any
+  seed reaching SER ≤ 0.005 under `psamp-k1`/`k2` where the 32-round
+  `psamp-k8`/`psamp-all`/`rand-k2` do not is evidence for gradual
+  commitment. Reaching it under all arms means the extra rounds, not the
+  granularity, did it.
+- R9.2 *Equal-round comparison.* Escapes (≤ 0.005 / 28 seed-cells) and
+  "improved > 0.05" for k1/k2 vs k8/all vs rand-k2 at 32 rounds. Small-k
+  is supported only if it beats k8 *and* all at the same round budget
+  (it commits fewer symbols in total, so a tie is not support).
+- R9.3 *Null.* `psamp-k1` from the true key moves ≤ 1 symbol on every cell
+  except latin t5 (whose true key sits 300 nats below the pentagram
+  optimum); more drift than the 6-round arms would mean 32 rounds of small
+  commits erode a correct key, which would disqualify the sampler.
+- R9.4 *Wordhom.* §7.4 recorded k = 8 as "a drip" at 6 rounds. With 32
+  rounds: `psamp-k8` / `psamp-k64` final SER vs `psamp-all` (0.026 / 0.047
+  at 6 rounds). If the small arms stay ≥ 0.3 the hypothesis is refuted
+  at 6.6 tokens/type — large simultaneous commits are what the SA needs
+  there.
+- Objective traps (german t0 bank 0.240, latin t5) are expected to resist
+  every arm; they are not evidence either way.
+
+### 9.1 Results (2026-08-27; artifacts `analysis/altloop/runs_smallk_{r2_1..4,wh}.json`)
+
+Rung 2, 32 rounds, final SER per seed (start SER in parentheses):
+
+| cell | psamp-k1 | psamp-k2 | post-k1 | psamp-k8 | psamp-all | rand-k2 |
+|---|---|---|---|---|---|---|
+| german t0 bank (0.24) | 0.240 / 0.240 | 0.240 / 0.240 | 0.240 / 0.240 | 0.240 / 0.027 | 0.240 / 0.027 | 0.240 / **0.000** |
+| german t1 bank (0.15) | 0.000 / 0.000 | 0.000 / 0.000 | 0.000 / 0.078 | 0.000 / 0.000 | 0.000 / 0.000 | 0.000 / 0.000 |
+| italian t0 bank (0.22) | 0.000 / 0.000 | 0.000 / 0.000 | 0.000 / 0.000 | 0.000 / 0.000 | 0.000 / 0.000 | 0.000 / 0.000 |
+| italian t4 bank (0.15) | 0.113 / 0.113 | 0.113 / 0.113 | 0.113 / 0.113 | 0.005 / 0.005 | 0.005 / 0.005 | 0.113 / 0.113 |
+| latin t0 bank (0.41) | 0.397 / 0.027 | 0.002 / 0.002 | 0.002 / 0.027 | 0.002 / 0.002 | 0.002 / 0.002 | 0.002 / 0.002 |
+| latin t3 bank (0.25) | 0.002 / 0.002 | 0.002 / 0.002 | 0.002 / 0.002 | 0.002 / 0.002 | 0.002 / 0.002 | 0.002 / 0.002 |
+| german t0 deep (0.59) | 0.282 / 0.525 | 0.515 / 0.282 | 0.480 / 0.240 | 0.240 / 0.240 | 0.240 / 0.240 | **0.000** / 0.311 |
+| german t1 deep (0.61) | 0.586 / 0.583 | 0.000 / 0.596 | 0.608 / 0.419 | 0.000 / 0.000 | 0.000 / 0.000 | 0.000 / 0.000 |
+| italian t0 deep (0.59) | 0.591 / 0.591 | 0.591 / 0.637 | 0.591 / 0.591 | 0.637 / 0.637 | **0.000 / 0.000** | 0.637 / 0.637 |
+| italian t4 deep (0.43) | 0.426 / 0.426 | 0.426 / 0.426 | 0.426 / 0.426 | 0.005 / 0.005 | 0.005 / 0.005 | 0.113 / 0.150 |
+| latin t0 deep (0.56) | stuck | stuck | stuck | stuck | stuck | stuck |
+| latin t3 deep (0.55) | 0.554 / 0.554 | 0.554 / 0.554 | 0.554 / 0.554 | 0.554 / 0.002 | 0.002 / 0.002 | 0.554 / 0.002 |
+| latin t5 pick / oracle (0.80 / 0.68) | ≥ 0.66 | ≥ 0.66 | ≥ 0.68 | ≥ 0.66 | ≥ 0.68 | ≥ 0.66 |
+| **escapes ≤ 0.005 / 28** | **6** | **9** | **6** | 15 | **18** | 13 |
+| **improved > 0.05 / 28** | 9 | 11 | 11 | 18 | 21 | 16 |
+
+Wordhom t0 (32 rounds, 1 seed, ~14 min per arm): German k8 **0.030** /
+k64 0.028 / all 0.027 (obj −13439 / −13422 / −13412); Italian k8 **0.406** /
+k64 0.049 / all 0.049.
+
+Null (`psamp-k1` from truth, 32 rounds): 0–1 symbol moved on every cell
+except latin t5 (12 symbols, SER 0.174 — the pentagram optimum, as before).
+
+**Readings.**
+
+- R9.1 **FAIL.** No deep trap is opened by k1/k2 that the large-commit arms
+  do not open; the reverse holds — italian t0 deep is opened only by
+  `psamp-all` (both seeds), latin t3 deep by k8/all/rand-k2, german t1 deep by
+  k8/all/rand-k2 on both seeds but by k2 on one and k1 on none.
+- R9.2 **FAIL, decisively.** At equal rounds the ordering is
+  all 18 > k8 15 > rand-k2 13 > k2 9 > k1 = post-k1 6. Judge-picked 1–2
+  symbol commits lose to a *random* 2-symbol kick.
+- R9.3 PASS (≤ 1 symbol outside t5).
+- R9.4 Mixed: German k8 catches `all` once given 32 rounds (the §7.4
+  "drip" was the round budget), Italian k8 does not (0.406); k64 = all on
+  both. Large simultaneous commits are still what the SA needs at 6.6
+  tokens/type.
+
+**Why the analogy fails here.** The stuck keys are, by construction,
+local optima of the n-gram objective under single-symbol reassignment —
+that is what the SA converged to. A 1-symbol commit therefore always lowers
+the objective, and the cold SA that follows walks straight back to the
+optimum it came from (32 rounds, 0–4 accepted, SER unchanged on 20/28 k1
+seed-cells). Escape needs several symbols moved *together* so that the
+SA lands in a different basin, which is why kick size dominates and why the
+random 2-symbol kick beats the judge's 1–2. The diffusion sampler's
+gradual commitment works because each partial commit is *kept* while the
+rest is re-denoised; under "accept on the n-gram objective" a partial commit
+is never kept. Gradual commitment would need the commit to be protected
+from the SA (frozen symbols) or the judge in the acceptance rule — the same
+conclusion as §7.7 (2).
+
+**Side result worth keeping.** 32 rounds instead of 6 (patience 32) is a
+free gain for every arm: `psamp-all` 18/28 escapes vs 10/24 at 6 rounds,
+opening italian t0 deep, latin t3 deep and one german t0 bank seed — the
+latter is the "objective trap" of §7.3, which `rand-k2` also opens
+(0.000), so german t0's 0.240 optimum is a *search* trap after all; latin
+t5 remains the objective trap. Not adopted as a change to any recorded
+number; carry the round budget forward in any future loop.

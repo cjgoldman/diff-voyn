@@ -192,3 +192,38 @@ def test_classify_tier():
         classify_tier(1.55, 2.6, 1.20, flip_rate=0.0, controls_language_like=True)
         == "PROMISING"
     )
+
+
+def test_alternate_schedule_rebaselines_objective():
+    """A schedule that changes the objective mid-run must re-score the
+    incumbent so ``obj_in`` of the next round is on the new scale, and the
+    patience counter restarts on the change."""
+    key = np.arange(4)
+    scale = {"v": 1.0}
+
+    def objective(m):
+        return -scale["v"] * float(m.sum())
+
+    def short_sa(m, rng):  # never improves: every round is rejected
+        return m, objective(m)
+
+    def schedule(r):
+        if r == 2:
+            scale["v"] = 10.0
+            return {"scale": 10.0}
+        return None
+
+    _, info = alternate(
+        key,
+        mechanism="none",
+        objective=objective,
+        short_sa=short_sa,
+        rounds=4,
+        patience=3,
+        schedule=schedule,
+    )
+    tr = info["trace"]
+    assert tr[0]["obj_in"] == -6.0 and tr[1]["obj_in"] == -6.0
+    assert tr[2]["obj_in"] == -60.0 and tr[2]["schedule"] == {"scale": 10.0}
+    # patience 3 would have stopped after round 2; the reset lets round 3 run
+    assert len(tr) == 4 and info["n_accepted"] == 0

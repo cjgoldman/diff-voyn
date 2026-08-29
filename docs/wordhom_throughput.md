@@ -103,3 +103,36 @@ rather than first-improvement per symbol.
    (rung 2, `_objective` over the whole stream per move) and to the
    `posterior_sample` proposer's Python loops — smaller gains (their
    streams are 1–4k symbols).
+
+## 5. Follow-up (2026-08-26, later): the round was still ~97 s
+
+`scripts/altloop_pol.py --only wh/` after the change above logged a flat
+**95–105 s per round** (`runs_hm.json`, all arms, all proposal sizes) and
+~300 s on the `Alike` stretch cells, against the ≈ 14 s predicted in §3.
+Component timing of one round (german/t0, 1,171 types, 7,733 letters, idle
+GPU): SA + polish 1.2 s, posterior `scores` 0.9 s, **`metrics` 47.5 s**,
+called twice per round by `alternate`. Inside `metrics`: `score_stream`
+9.5 s and **`unit_ser` 38 s** — `levenshtein_ser`
+(`heads/rung4_arithmetic.py`) ran its O(n·m) edit-distance DP with a
+pure-Python inner loop (60 M iterations for a 7.7k-letter decode;
+quadratic, so the ~20k-letter `Alike` cells paid ~4× more). §1 never
+measured it because that profile was taken on `altloop_vms.py`, whose
+manuscript cells have no ground truth and no SER. The wordhom throughput
+doc's "metrics 10 s" was the diffusion term only.
+
+Fix: `_levenshtein` compiled with numba (same DP, two rolling rows,
+bit-identical to the Python version on random and near-identical pairs of
+lengths 0–7.7k): 38 s → **0.13 s**. One round is now ≈ 24 s
+(2 × `score_stream` 9.5 s + SA 1.2 s + posterior 0.9 s), i.e. the diffusion
+metric is the whole remaining cost. A run launched before this fix keeps
+the old function in memory — restart to benefit.
+
+Remaining term, not changed here: `DiffusionEvaluator.score_ids` tiles a
+long stream into windows and scores each with `ScoreSettings(batch=1)` —
+64 strata × 8 windows = 512 single-sequence forward passes at ~45 ms each
+(kernel-launch bound: 100 % of one CPU core, GPU ~40 %). Batching the
+windows of one stream as rows (`score_ids(x.reshape(8, 1024))` measured
+2.8 s vs 9.4 s) would be ~3.4× faster but changes the per-window CRN seeds
+(`seed + 7919·k`), so the recorded Phase-6 numbers would not reproduce —
+do it behind a per-row-seed extension of `per_window_nelbo_bits`, not by
+re-chunking. Alternatively drop `metrics_proposed` (§4 item 1) to halve it.

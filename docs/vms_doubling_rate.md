@@ -10,6 +10,7 @@
 | geminate-collapse script | `scripts/doubling_collapse.py` |
 | full tables | `data/analysis/doubling/doubling_report.md`, `collapse_report.md` (+ `.json`) |
 | Naibbe ciphertext doubling (added 2026-08-21) | `scripts/naibbe_doubling.py` → `data/analysis/doubling/naibbe_doubling.md` (+ `.json`) |
+| word-terminal doubling, plaintext vs VMS (added 2026-08-26, §8) | `scripts/terminal_doubling.py` → `data/analysis/doubling/terminal_doubling.md` (+ `.json`) |
 | Naibbe deck / sticky sweep vs Greshko's metrics | `scripts/naibbe_deck_sweep.py` → `data/analysis/doubling/naibbe_deck_sweep.md` (+ `.json`; ~8 min) |
 
 ## 1. The question
@@ -275,7 +276,7 @@ the statistic is text-dependent at the ±1/1000 level.)
 - **No Phase-0 artifacts were touched.** This analysis reads the frozen corpora,
   cipher tables and VMS ingest; it writes only under `data/analysis/doubling/`.
 
-## 7. Open items
+## 7. Open items (as of 2026-08-21)
 
 - German's task-0.7 tuned `doubling_strength` (0.422) does not match the
   closed-form inversion (~0.23) the way Latin's and Italian's do — probably the
@@ -293,3 +294,196 @@ the statistic is text-dependent at the ±1/1000 level.)
   would show whether the excess is strictly adjacent (a doubling mechanism) or
   whether scribes also favour recently-used homophones ("sticky" reuse) — the
   latter is outside Boxer's model as written.
+
+## 8. Word-terminal doubling: plaintext languages vs the manuscript (added 2026-08-26)
+
+**Script** `scripts/terminal_doubling.py` → `data/analysis/doubling/terminal_doubling.md` (+ `.json`), ~2 min.
+
+Motivation: Boxer's draft supports its paragraph-terminal argument with an
+*inventory* (which tokens double/triple at paragraph ends) and with cross-word
+triple-letter rates, neither of which is the statistic the argument needs. This
+run measures (a) per-language word-**final** double-letter rates separated from
+word-**initial** ones, with mode diversity; (b) the same rate at sentence-final
+and paragraph-final position; (c) the Table-5 cross-word triples decomposed by
+mechanism; (d) the manuscript's paragraph-terminal token-doubling rate with its
+denominator. Corpora: our Latin (CorpusCorporum, 67 docs / 4.1M words), Italian
+(raw texts, 0.9M), German (DTA, 560 docs / 13.3M) plus Boxer's Dutch (DBNL),
+French, English (EEBO) and Spanish (Quijote) as out-of-inventory references.
+Words = whitespace tokens, lowercased, diacritics stripped, a–z only, ß→ss;
+Roman-numeral tokens (`^[ivxlcdm]+$`) are dropped — they end in `-ii/-xx/-vv`
+and made up 80 % of Latin/Italian paragraph-final "doubles" before the filter.
+
+### 8.1 Plaintext: word-final doubles (per 1000 word tokens, Wilson 95 % CI)
+
+| language | word-FINAL double | word-INITIAL double | final modes @90 % | H(mode) bits | top final modes |
+|---|---|---|---:|---:|---|
+| **German** | **49.3** (49.1–49.4) (29.0 with ß kept separate) | 0.2 | 4 | 2.25 | -ss 41 %, -nn 20 %, -ff 18 %, -tt 11 %, -ll 5 %, -rr 3 % |
+| English | 14.9 (14.6–15.3) | 2.2 | 3 | 1.31 | -ll 72 %, -ee 14 %, -oo 11 % |
+| French | 4.0 (3.8–4.2) | 0.3 | 1 | 0.15 | -ee 98 % |
+| Latin | 3.4 (3.4–3.5) | 0.6 | 2 | 1.09 | -ii 83 %, -ee 8 % |
+| Dutch | 3.3 (3.2–3.3) | **21.7** | 3 | 1.50 | -ee 60 %, -oo 30 % |
+| Italian | 0.6 (0.5–0.6) | 0.0 | 4 | 2.28 | -ee 34 %, -ii 32 %, -ll 14 %, -ss 11 % |
+| Spanish | 0.2 (0.2–0.2) | 5.4 | 1 | 0.00 | -ee 100 % |
+
+The abstract's claim ("German supports a rich set of doubled-letter word
+endings at rates that Latin and other languages do not") is **confirmed and
+now quantified**: German ends 1 word in 20 with a double, 10–15× Latin and
+80× Italian, and is the only language whose final-mode distribution has four
+modes at 90 % coverage *and* > 2 bits of entropy (Italian's 2.28 bits is
+entropy over 500 events). Dutch is the mirror image — its doubling is almost
+all word-*initial* (`ee-`, `oo-`), which is exactly the case Table 5 conflates.
+
+### 8.2 Position dependence
+
+| language | all words | sentence-final | paragraph-final (n paragraphs) | paragraph ends in a triple letter /1000 |
+|---|---|---|---|---|
+| German | 49.3 | 25.1 (24.6–25.5) | 25.1 (24.5–26.3) (205 157) | 0.0 |
+| English | 14.9 | 14.6 | 21.7 (15.1–31.0) (1 337) | 0.0 |
+| French | 4.0 | 12.6 | 11.0 (8.1–14.8) (3 829) | 0.0 |
+| Dutch | 3.3 | 3.3 | 3.2 (2.8–3.7) (56 267) | 0.2 |
+| Latin | 3.4 | 4.0 | 2.4 (2.1–2.8) (67 891) | 0.0 |
+| Italian | 0.6 | 0.5 | 0.4 (0.3–0.8) (29 284) | 0.0 |
+| Spanish | 0.2 | 0.2 | 0.2 (9 831) | 0.0 |
+
+Terminal position is *not* neutral, and in the direction opposite to the
+draft's `lassen müssen` intuition: German's word-final doubling **halves** at
+sentence and paragraph end (49 → 25/1000; the clause-final slot is dominated by
+`-en` infinitives/participles, and the `-ss/-nn` mass sits on `dass/denn/wann/
+kann/muss` inside the clause). French *rises* (4 → 12, `-ée` participles at
+clause end). No language ends a paragraph in a triple letter at more than
+0.2/1000 — so any Voynich paragraph-terminal *triple* token would need a
+mechanism outside the letter-reuse model.
+
+### 8.3 Cross-word triples (Boxer's Table 5), per 10 000 letters, decomposed
+
+| language | total | `..xx\|x..` (word-final double) | `..x\|xx..` (word-initial double) | share word-final |
+|---|---:|---:|---:|---:|
+| German | 5.41 | 5.38 | 0.03 | 0.99 |
+| Dutch | 6.73 | 0.47 | **6.24** | 0.07 |
+| French | 1.65 | 1.64 | 0.00 | 1.00 |
+| English | 0.97 | 0.69 | 0.28 | 0.72 |
+| Latin | 0.37 | 0.35 | 0.02 | 0.95 |
+| Spanish | 0.29 | 0.05 | 0.23 | 0.19 |
+| Italian | 0.06 | 0.06 | 0.00 | 1.00 |
+
+Dutch's headline triple rate (highest of all) is 93 % the word-initial
+mechanism, which cannot produce a paragraph-terminal double; French's is
+entirely `e` at 1.6/10k from a single mode. The decomposition, not the raw
+rate, is what discriminates German.
+
+### 8.4 The manuscript side (paragraph text, tokens = EVA words)
+
+| source | paragraphs | terminal double /1000 (k) | terminal triple | initial double | line-final double | running pair double | terminal/running | binomial p |
+|---|---:|---|---|---|---|---|---:|---:|
+| Takahashi IT2a | 819 | 6.1 (2.6–14.2) (5) | 0 | 1.2 (1) | 5.8 | 8.6 | 0.71 | 0.83 |
+| Reference RF1b (IT2a paragraph bounds transferred) | 826 | 7.3 (3.3–15.8) (6) | 0 | 0 | 3.0 | 8.0 | 0.91 | 0.65 |
+| Boxer csv (`par` column) | 790 | 7.6 (3.5–16.5) (6) | 0 (1 with uncertain tokens kept) | 3.8 | 5.9 | 9.6 | 0.79 | 0.77 |
+
+Currier A / B do not differ (A 7.3 vs B 5.8 on IT2a; 2 vs 3 events). The
+terminal doubled tokens are `chor, cthy, okedy, okeey, qokeey` (IT2a) — one
+each. RF1b carries no `<$>` end-of-paragraph marks (IT2a has 772), so its
+paragraph boundaries are IT2a's transferred by (page, line).
+
+**Findings.** (1) The paragraph-terminal doubling rate is **5–6 events in ~820
+paragraphs, 6–8/1000, statistically indistinguishable from the running
+adjacent-pair rate (8–10/1000)** — no terminal enrichment (ratio 0.7–0.9,
+p ≈ 0.6–0.8). (2) There are **no** paragraph-terminal triple tokens in either
+EVA transliteration and one at most in Boxer's own csv (requires an uncertain
+token). Table 4's triples must rest on a different definition (glyph-level, or
+line rather than paragraph ends) and should be stated with its denominator.
+
+### 8.5 Consistency with Boxer's model (reuse parameter s)
+
+Under the model the VMS running rate is s × (plaintext running letter-doubling)
+and the paragraph-terminal rate is s × (plaintext paragraph-final word-double
+rate). Estimating s from running text and *predicting* the terminal rate:
+
+| language | running letter-double /1000 | implied s | paragraph-final word-double /1000 | predicted VMS terminal | s needed for observed 6.1 | in VMS CI 2.6–14.2? |
+|---|---:|---:|---:|---:|---:|---|
+| German | 37.8 | 0.23 | 25.1 | **5.7** | 0.24 | yes |
+| English | 28.8 | 0.30 | 21.7 | 6.5 | 0.28 | yes |
+| French | 35.1 | 0.25 | 11.0 | 2.7 | 0.56 | yes |
+| Latin | 24.7 | 0.35 | 2.4 | 0.8 | 2.54 (> 1) | no |
+| Dutch | 39.3 | 0.22 | 3.2 | 0.7 | 1.91 (> 1) | no |
+| Italian | 43.5 | 0.20 | 0.4 | 0.1 | 13.8 | no |
+| Spanish | 18.4 | 0.47 | 0.2 | 0.1 | 30 | no |
+
+This is the quantitative form of the draft's §6.1 argument, and it does
+separate the languages: **German predicts the observed terminal rate with the
+same s (0.23–0.24) that fits running text**, whereas Latin, Italian, Dutch and
+Spanish need s > 1 — impossible under the model — to produce five terminal
+doubles in 819 paragraphs. English fits equally well and French is
+borderline; with k = 5 the test cannot discriminate German from English. The
+inference rests entirely on Boxer's word = letter premise, which the Phase-6
+and word-homophonic studies (`docs/wordhom_study.md`) found untestable at the
+manuscript's 3–5 tokens per type; it is a consistency check, not evidence
+for the model.
+
+**Recommendation for the review**: report §8.1 (rate + mode diversity, word-
+final vs word-initial), the paragraph-terminal count with its denominator
+(5/819), the absence of terminal triples in the EVA transliterations, and
+the s-consistency table; drop the triple inventory or define it with counts.
+
+### 8.6 Can an "in-word only" reuse rule give s = 1? (added 2026-08-26)
+
+Variant rule: the scribe reuses the same homophone only when the doubled
+letter falls *inside one plaintext word*, never across a word boundary.
+`scripts/inword_doubling.py` → `data/analysis/doubling/inword_doubling.md`.
+Rates per 1000 adjacent letter pairs of the whitespace-stripped text (the same
+denominator the VMS token pairs map to); VMS reference 8.6/1000 (IT2a; 6.6–10.4
+across transcriptions/policies).
+
+| language | in-word doubles /1000 | cross-word doubles /1000 | s needed (in-word rule) | modes to write single for s = 1 (was, §5) | in-word modes |
+|---|---:|---:|---:|---:|---|
+| Latin | 15.2 | 9.5 | 0.57 | 2 (ss, ll) (was 5) | ss 30 %, ll 21 %, ii 8 %, cc 7 %, rr 7 % |
+| Italian | 32.9 | 10.6 | 0.26 | 5 (was 8) | ll 21 %, ss 20 %, tt 18 %, cc 10 % |
+| German | 29.7 (25.0 ß kept) | 8.1 | 0.29 (0.34) | 4 (was 5–6) | ss 28 %, ff 17 %, nn 16 %, ll 14 %, tt 12 % |
+| Dutch | 31.3 | 8.0 | 0.27 | 5 | ee 37 %, oo 22 % |
+| French | 24.1 | 11.0 | 0.36 | 5 | ll 23 %, ss 19 %, mm 13 % |
+| English | 18.4 | 10.4 | 0.47 | 3 | ll 31 %, oo 14 %, ss 13 % |
+| Spanish | 7.4 | 11.1 | **1.16** | 0 | ll 77 %, rr 20 % |
+
+**No.** Cross-word doubles are a near-constant 8–11/1000 in every language, so
+the in-word restriction removes a third of Latin's doubling and a fifth of
+German's, but the in-word residue (15–33/1000) still sits 2–4× above the VMS.
+Latin is the closest inventory language (s = 0.57) and needs only *ss* and
+*ll* written as single symbols to reach s = 1 (vs five geminates under the
+running-text rule, §5) — a much more attested pair (ligatured ſſ / ll) than the
+five-way collapse. The only language where the in-word rule alone gives
+s ≈ 1 is Spanish, and for the orthographic reason the collapse story posits:
+its doubles are 97 % *ll/rr*, which Spanish treats as single letters. Under an
+in-word + single-symbol-for-ll/rr convention Spanish would produce
+~0.2/1000 — far too few — so the rule works there only if ll/rr *are* written
+double. Net: the in-word rule trades the strength of the reuse convention for
+a smaller geminate collapse; it does not remove the need for one (except in
+Spanish, which is outside the inventory and fails the word-terminal test in
+§8.5 badly).
+
+### 8.7 Sentence-final baseline (added 2026-08-26)
+
+Sentence-final words are the tighter baseline for the manuscript's
+paragraph-terminal position (clause-final syntax — German verb-final order,
+French participles — shifts the ending inventory), and they give 10–60× more
+events than paragraph-final words. Sentence = row of Boxer's corpus CSVs
+(Italian: `.!?` split). From `terminal_doubling.json`, `position.sentence_final`.
+
+| language | all words | sentence-nonfinal | **sentence-final** (n sentences) | paragraph-final | sentence-final modes | predicted VMS terminal at running-text s | s needed for observed 6.1 | in VMS CI 2.6–14.2? |
+|---|---:|---:|---|---:|---|---:|---:|---|
+| German | 49.3 | 50.1 | **25.1** (24.6–25.5) (455 489) | 25.1 | -ss 36 %, -tt 18 %, -ll 15 %, -ff 14 %, -nn 9 % | 5.7 | 0.24 | yes |
+| English | 14.9 | 15.0 | 14.6 (13.2–16.2) (25 684) | 21.7 | -ll 47 %, -oo 25 %, -ee 21 % | 4.4 | 0.42 | yes |
+| French | 4.0 | 3.6 | 12.6 (11.3–14.0) (25 209) | 11.0 | -ee 99 % | 3.1 | 0.49 | yes |
+| Latin | 3.4 | 3.4 | 4.0 (3.7–4.3) (205 321) | 2.4 | -ii 63 %, -nn 17 %, -qq 7 % | 1.4 | 1.53 (> 1) | no |
+| Dutch | 3.3 | 3.2 | 3.3 (2.9–3.7) (89 494) | 3.2 | -ee 69 % | 0.7 | 1.86 (> 1) | no |
+| Italian | 0.6 | 0.6 | 0.5 (0.3–0.7) (44 885) | 0.4 | -ee 48 %, -ii 43 % | 0.1 | 13 | no |
+| Spanish | 0.2 | 0.2 | 0.2 (9 831) | 0.2 | -ee 100 % | 0.1 | 30 | no |
+
+Sentence-final and paragraph-final rates agree within CI for every language
+with adequate paragraph counts, so §8.5's conclusion is unchanged on the
+tighter baseline: German (and English) predict the observed VMS terminal rate
+at the running-text s; Latin, Dutch, Italian and Spanish need s > 1. The
+syntax effect is real but goes *against* German — its sentence-final doubled
+endings (`-ss` `dass/muss`, `-tt` `statt/hatt`, `-ll` `soll/will`, `-ff`)
+run at half its running-text rate; English and Dutch are position-neutral;
+French doubles at clause end (`-ée`). Latin's sentence-final `-ii` residue
+(63 %) is genitive/plural `-ii` after numeral filtering, and `-qq` is
+abbreviation (`qq.`).

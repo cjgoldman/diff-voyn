@@ -120,6 +120,8 @@ def alternate(
     patience: int = 2,
     seed: int = 0,
     on_round: Callable[[dict], None] | None = None,
+    accept_fn: Callable[[np.ndarray, np.ndarray, int], tuple[bool, dict]] | None = None,
+    schedule: Callable[[int], dict | None] | None = None,
 ) -> tuple[np.ndarray, dict]:
     """Returns the best key by n-gram objective and a per-round trace.
 
@@ -131,7 +133,11 @@ def alternate(
     alone (the "is it just the extra SA?" control). ``pair_swap`` /
     ``random_swap`` are the bijection-preserving forms (``k`` transpositions
     of key indices, judge-ranked / uniformly random). ``on_round(info)`` is
-    called after every completed round (streaming metrics).
+    called after every completed round (streaming metrics). ``schedule(r)``
+    is called at the start of round ``r`` and may change the *objective*
+    (the wildcard anneal, ``docs/alt_loop_plan.md`` §8.6); when it returns a
+    non-None dict the incumbent is re-scored under the new objective and the
+    patience counter restarts, so acceptance always compares like with like.
     """
     if mechanism not in MECHANISMS:
         raise ValueError(mechanism)
@@ -143,8 +149,15 @@ def alternate(
     stale = 0
     for r in range(rounds):
         t0 = time.time()
+        if schedule is not None:
+            change = schedule(r)
+            if change is not None:
+                cur_obj = float(objective(cur))
+                stale = 0
         prop = cur.copy()
         info = {"round": r, "obj_in": cur_obj}
+        if schedule is not None and change is not None:
+            info["schedule"] = change
         if mechanism == "posterior":
             D = disagreements(scores_fn(cur), cur)
             info["n_disagree"] = len(D)
@@ -231,7 +244,13 @@ def alternate(
         info["obj_after_sa"] = float(new_obj)
         info["n_changed_by_sa"] = int((new != prop).sum())
         info["n_changed_total"] = int((new != cur).sum())
-        accepted = new_obj > cur_obj + 1e-9
+        # accept_fn(cur, new, round) -> (accepted, info) replaces the n-gram
+        # acceptance rule (the judge, docs/alt_loop_plan.md §8.5)
+        if accept_fn is None:
+            accepted = new_obj > cur_obj + 1e-9
+        else:
+            accepted, ainfo = accept_fn(cur, new, r)
+            info["judge"] = ainfo
         info["accepted"] = bool(accepted)
         if metrics:
             info["metrics_proposed"] = metrics(prop)
@@ -252,6 +271,7 @@ def alternate(
         "k": k,
         "start_obj": float(objective(key)),
         "final_obj": cur_obj,
+        "final_map": np.asarray(cur).tolist(),
         "start_metrics": start_metrics,
         "final_metrics": metrics(cur) if metrics else {},
         "n_rounds": len(trace),
