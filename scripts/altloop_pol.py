@@ -160,13 +160,24 @@ class WHCell:
         self.symbols = np.asarray(inst["symbols"], dtype=np.int64)
         self.pos = np.asarray(inst["token_pos"], dtype=np.int64)
         self.adj = adjacency(self.symbols, self.pos)
-        tr = inst["truth"]
-        self.plain = np.asarray(tr["plain_ids"], dtype=np.int64)
-        self.true_map = np.asarray(tr["sym_to_unit"], dtype=np.int64)
+        tr = inst.get("truth", {})
         self.n_sym = int(inst["n_symbols"])
         self.head = WordHomophonicHead(ng, seed=args.seed)
         self.targets = self.head.targets_for(hyp)
-        assert self.targets.as_list() == tr["bigrams"], "targets mismatch"
+        # battery cells (scripts/wordhom_battery.py): negatives carry no key
+        # and cross-language cells a key in another hypothesis' unit space —
+        # type-level truth only when the hypothesis is the generating one
+        self.has_truth = (
+            tr.get("kind") == "wordhom" and tr.get("language") == hyp
+        )
+        self.plain = (
+            np.asarray(tr["plain_ids"], dtype=np.int64) if "plain_ids" in tr else None
+        )
+        if self.has_truth:
+            self.true_map = np.asarray(tr["sym_to_unit"], dtype=np.int64)
+            assert self.targets.as_list() == tr["bigrams"], "targets mismatch"
+        else:
+            self.true_map = None
         self.start = np.asarray(start_map, dtype=np.int64)
         self.ev = ev
         self.args = args
@@ -260,6 +271,8 @@ class WHCell:
         return S
 
     def wrong(self, m):
+        if self.true_map is None:
+            return np.zeros(len(m), dtype=bool)
         return m != self.true_map
 
     def judge_bits(self, m, seed):
@@ -284,9 +297,11 @@ class WHCell:
         dec = self.decode(m)
         w = self.wrong(m)
         return {
-            "ser": float(unit_ser(dec, self.plain)),
-            "map_err_occ": float((self.occ * w).sum() / self.occ.sum()),
-            "n_wrong_types": int(w.sum()),
+            "ser": float(unit_ser(dec, self.plain)) if self.plain is not None else None,
+            "map_err_occ": (
+                float((self.occ * w).sum() / self.occ.sum()) if self.has_truth else None
+            ),
+            "n_wrong_types": int(w.sum()) if self.has_truth else None,
             "violations": int(rule_violations(m[self.symbols], self.symbols, self.adj)),
             "elbo_bits": float(
                 self.ev.score_stream(dec, language=self.lang, n_strata=64)
@@ -311,8 +326,43 @@ def build_cells(args, ng, ev, *, stretch=False):
         )
         best = max(rec["candidates"], key=lambda c: c["inner"])
         cells.append(WHCell(inst, hyp, ng, ev, args, best["map"]))
+    if getattr(args, "battery", False):
+        cells = build_battery_cells(args, ng, ev)
     if args.only:
         cells = [c for c in cells if any(o in c.name for o in args.only)]
+    return cells
+
+
+def build_battery_cells(args, ng, ev):
+    """``--cells NAME:HYP`` from the wordhom battery
+    (``analysis/wordhom/battery/wordtypesall`` + ``battery_solves.json``),
+    falling back to the Phase-6 wordhom controls (positives) for names not
+    in the battery; the start is the solve's n-gram MDL pick as always."""
+    root = data_root()
+    wd = root / "analysis/wordhom"
+    bat = wd / "battery/wordtypesall"
+    man = {m["name"]: m for m in json.loads((bat / "manifest.json").read_text())}
+    solves = []
+    for fn in ("battery/battery_solves.json", "controls_solves.json"):
+        if (wd / fn).exists():
+            solves += json.loads((wd / fn).read_text())["instances"]
+    cells = []
+    for spec in args.cells:
+        name, hyp = spec.rsplit(":", 1)
+        if name in man:
+            inst = json.loads((bat / man[name]["file"]).read_text())
+        else:
+            fname = name.replace("/", "_") + "_wordtypesall.json"
+            inst = json.loads((wd / "controls/wordtypesall" / fname).read_text())
+        rec = next(
+            (s for s in solves if s["instance"] == name and s["hypothesis"] == hyp),
+            None,
+        )
+        if rec is None:
+            print(f"no solve for {name}:{hyp}, skipped", flush=True)
+            continue
+        best = max(rec["candidates"], key=lambda c: c["inner"])
+        cells.append(WHCell(inst, hyp, ng, ev, args, best["map"]))
     return cells
 
 
@@ -428,6 +478,8 @@ def stage_run(args, cells, log, out_dir):
                     key = (c.name, arm, start_name, seed)
                     if key in done:
                         continue
+                    if start_name == "null" and getattr(c, "true_map", None) is None:
+                        continue
                     start = c.true_map if start_name == "null" else c.start
                     if args.start_from:
                         prev = json.loads(
@@ -501,8 +553,9 @@ def stage_run(args, cells, log, out_dir):
                     res.append(rec)
                     done[key] = rec
                     sm, fm = info["start_metrics"], info["final_metrics"]
+                    fs = lambda x: "n/a" if x is None else f"{x:.3f}"
                     log(
-                        f"{c.name} {arm} {start_name} s{seed}: ser {sm['ser']:.3f}→{fm['ser']:.3f} "
+                        f"{c.name} {arm} {start_name} s{seed}: ser {fs(sm['ser'])}→{fs(fm['ser'])} "
                         f"obj {info['start_obj']:.1f}→{info['final_obj']:.1f} "
                         f"acc {info['n_accepted']}/{info['n_rounds']} {rec['seconds']:.0f}s"
                     )
@@ -524,8 +577,9 @@ def stage_report(args, out_dir):
         groups.setdefault((r["cell"], r["arm"], r["start"]), []).append(r)
     for (cell, arm, start), rs in sorted(groups.items()):
         rs.sort(key=lambda r: r["seed"])
+        fs = lambda x: "n/a" if x is None else f"{x:.3f}"
         sers = ", ".join(
-            f"{r['start_metrics']['ser']:.3f}→{r['final_metrics']['ser']:.3f}"
+            f"{fs(r['start_metrics']['ser'])}→{fs(r['final_metrics']['ser'])}"
             for r in rs
         )
         dobj = ", ".join(f"{r['final_obj']-r['start_obj']:+.1f}" for r in rs)
@@ -590,6 +644,12 @@ def main():
     p.add_argument("--t-start", type=float, default=2.0)
     p.add_argument("--t-end", type=float, default=0.3)
     p.add_argument("--stretch", action="store_true")
+    p.add_argument(
+        "--battery",
+        action="store_true",
+        help="cells from --cells NAME:HYP over the wordhom battery (scripts/wordhom_battery.py)",
+    )
+    p.add_argument("--cells", nargs="*", default=[])
     p.add_argument("--tag", default="")
     p.add_argument("--deep", action="store_true")
     args = p.parse_args()

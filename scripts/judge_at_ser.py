@@ -62,22 +62,32 @@ CELLS = [("positive/german/Alike", "german"), ("positive/italian/Alike", "italia
 WILD_FILES = ["runs_wild32map.json", "runs_wild96.json", "runs_anneal.json", "runs_anneal_de.json"]
 
 
-def load_cell(root, name, lang):
+def load_cell(root, name, lang, wild_files=WILD_FILES, prefix="wild"):
     wd = root / "analysis/wordhom"
-    inst = json.loads(
-        (wd / "controls/wordtypesall" / (name.replace("/", "_") + "_wordtypesall.json")).read_text()
-    )
-    solves = json.loads((wd / "controls_solves.json").read_text())["instances"]
+    bat = wd / "battery/wordtypesall"
+    man = {}
+    if (bat / "manifest.json").exists():
+        man = {m["name"]: m for m in json.loads((bat / "manifest.json").read_text())}
+    if name in man:
+        inst = json.loads((bat / man[name]["file"]).read_text())
+    else:
+        inst = json.loads(
+            (wd / "controls/wordtypesall" / (name.replace("/", "_") + "_wordtypesall.json")).read_text()
+        )
+    solves = []
+    for fn in ("battery/battery_solves.json", "controls_solves.json"):
+        if (wd / fn).exists():
+            solves += json.loads((wd / fn).read_text())["instances"]
     rec = next(s for s in solves if s["instance"] == name and s["hypothesis"] == lang)
     stuck = max(rec["candidates"], key=lambda c: c["inner"])["map"]
     finals = {}
-    for fn in WILD_FILES:
+    for fn in wild_files:
         fp = root / "analysis/altloop" / fn
         if not fp.exists():
             continue
         for r in json.loads(fp.read_text()):
             if r["cell"] == f"wh/{name}/{lang}" and r["start"] == "stuck" and "final_map" in r:
-                finals[f"wild:{fn[5:-5]}/s{r['seed']}"] = r["final_map"]
+                finals[f"{prefix}:{fn[4:-5]}/s{r['seed']}"] = r["final_map"]
     return inst, np.asarray(stuck, dtype=np.int64), finals
 
 
@@ -155,6 +165,14 @@ def main():
     p.add_argument("--score-windows", type=int, default=16)
     p.add_argument("--primary", default=CALIBRATION_VERSION)
     p.add_argument("--tag", default="")
+    p.add_argument(
+        "--battery",
+        nargs="*",
+        default=None,
+        help="NAME:HYP cells from the wordhom battery / controls; keys = truth (if the "
+        "hypothesis is the generating language), stuck, and the finals of --run-tags",
+    )
+    p.add_argument("--run-tags", nargs="*", default=["_bat_wild", "_bat_anneal"])
     args = p.parse_args()
     out_dir = root / "analysis/altloop"
     path = out_dir / f"judge_at_ser{args.tag}.json"
@@ -169,20 +187,36 @@ def main():
     ev = DiffusionEvaluator.from_checkpoint(args.ckpt, device=args.device)
     table = CalibrationTable.load(args.primary, root)
     res = json.loads(path.read_text()) if path.exists() else []
-    done = {(r["cell"], r["key"]) for r in res}
-    for name, lang in CELLS:
+    done = {(r["cell"], r.get("hypothesis", r["truth_language"]), r["key"]) for r in res}
+    if args.battery is not None:
+        cells = [tuple(c.rsplit(":", 1)) for c in args.battery]
+        wild_files = [f"runs{t}.json" for t in args.run_tags]
+        prefix = "final"
+        args.fracs, args.rare_fracs = [], []
+    else:
+        cells, wild_files, prefix = CELLS, WILD_FILES, "wild"
+    from diff_voyn.heads.wordhom import language_targets
+    from diff_voyn.vms.apply import build_ngram_evaluator
+
+    ng = build_ngram_evaluator()
+    for name, lang in cells:
         if args.only and not any(o in name for o in args.only):
             continue
-        inst, stuck, finals = load_cell(root, name, lang)
+        inst, stuck, finals = load_cell(root, name, lang, wild_files, prefix)
         meta = _inst_meta(inst)
-        tr = inst["truth"]
-        true_map = np.asarray(tr["sym_to_unit"], dtype=np.int64)
-        plain = np.asarray(tr["plain_ids"], dtype=np.int64)
-        targets = UnitTargets.from_list(tr["bigrams"])
+        tr = inst.get("truth", {})
+        has_truth = tr.get("kind") == "wordhom" and tr.get("language") == lang
+        true_map = np.asarray(tr["sym_to_unit"], dtype=np.int64) if has_truth else None
+        plain = np.asarray(tr["plain_ids"], dtype=np.int64) if "plain_ids" in tr else None
+        targets = (
+            UnitTargets.from_list(tr["bigrams"]) if has_truth else language_targets(ng, lang)
+        )
         sym = np.asarray(inst["symbols"], dtype=np.int64)
         adj = adjacency(sym, np.asarray(inst["token_pos"], dtype=np.int64))
-        occ = np.bincount(sym, minlength=len(true_map))
-        keys = {"truth": true_map, "stuck": stuck}
+        occ = np.bincount(sym, minlength=int(inst["n_symbols"]))
+        keys = {"stuck": stuck}
+        if has_truth:
+            keys["truth"] = true_map
         keys.update({k: np.asarray(v, dtype=np.int64) for k, v in finals.items()})
         for cs in range(args.corrupt_seeds):
             rng = np.random.default_rng(1000 + cs)
@@ -191,28 +225,29 @@ def main():
             for f in args.rare_fracs:
                 keys[f"rare@{f:.2f}/s{cs}"] = corrupt(true_map, occ, f, rng, targets.n, True)
         for kname, m in keys.items():
-            if (name, kname) in done:
+            if (name, lang, kname) in done:
                 continue
             t0 = time.time()
             dec = expand_units(m[sym], targets)
-            wrong = m != true_map
+            wrong = (m != true_map) if has_truth else np.zeros(len(m), bool)
             r = {
-                "cell": name, "truth_language": lang, "key": kname,
-                "ser": float(unit_ser(dec, plain)),
-                "map_err_types": float(wrong.mean()),
-                "map_err_occ": float((occ * wrong).sum() / occ.sum()),
+                "cell": name, "truth_language": tr.get("language"), "hypothesis": lang,
+                "control": inst.get("control", "positive"), "key": kname,
+                "ser": float(unit_ser(dec, plain)) if plain is not None else None,
+                "map_err_types": float(wrong.mean()) if has_truth else None,
+                "map_err_occ": float((occ * wrong).sum() / occ.sum()) if has_truth else None,
                 "violations": int(rule_violations(m[sym], sym, adj)),
                 "n_plain": int(len(dec)),
             }
             r.update(score_map(ev, table, inst, meta, m, targets, lang, budget=args.budget,
                                seeds=tuple(range(args.seeds)), score_windows=args.score_windows,
                                seed=0))
-            r["called"] = r["language_like"] and r["top_language_of_decode"] == lang
+            r["called"] = bool(r["language_like"] and r["top_language_of_decode"] == lang)
             r["seconds"] = round(time.time() - t0, 1)
             res.append(r)
             write_json_atomic(path, res)
             print(
-                f"{name} {kname:14s} ser={r['ser']:.3f} plain={r['plain_bits']:.3f} "
+                f"{name}/{lang} {kname:14s} ser={-1 if r['ser'] is None else r['ser']:.3f} plain={r['plain_bits']:.3f} "
                 f"margin={r['structure_margin']:.2f} rank={r['language_rank_of_decode']} "
                 f"top_margin={r['top_margin_bits']:.3f}±{r['top_margin_uncertainty_bits']:.3f} "
                 f"flip={r['replicate_flip_rate']:.2f} like={r['language_like']} "
@@ -233,9 +268,10 @@ def report(path, md):
         "| cell | key | SER | map err (occ) | plain bits | structure margin | rank | top margin ± unc | flip | window vote | MDL/sym | like | called |",
         "|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
-    for r in sorted(res, key=lambda r: (r["cell"], r["ser"])):
+    fs = lambda x: "n/a" if x is None else f"{x:.3f}"
+    for r in sorted(res, key=lambda r: (r["cell"], r.get("hypothesis", ""), -1 if r["ser"] is None else r["ser"])):
         lines.append(
-            f"| {r['cell']} | {r['key']} | {r['ser']:.3f} | {r['map_err_occ']:.3f} | {r['plain_bits']:.3f} | "
+            f"| {r['cell']}/{r.get('hypothesis', r['truth_language'])} | {r['key']} | {fs(r['ser'])} | {fs(r['map_err_occ'])} | {r['plain_bits']:.3f} | "
             f"{r['structure_margin']:.2f} | {'>'.join(l[:2] for l in r['language_rank_of_decode'])} | "
             f"{r['top_margin_bits']:.3f} ± {r['top_margin_uncertainty_bits']:.3f} | {r['replicate_flip_rate']:.2f} | "
             f"{r['window_vote_for_top']:.2f} | {r['total_per_all_symbols']:.3f} | {'yes' if r['language_like'] else 'no'} | "
