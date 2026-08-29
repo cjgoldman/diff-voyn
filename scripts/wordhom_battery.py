@@ -16,6 +16,13 @@ Instances (all ``wordtypesall``, one per language and shape; ``Alike`` =
                                      5 % / 10 % per character) enciphered
                                      under the clean key — POSITIVE whose
                                      truth is itself noisy
+  nodouble/<lang>/Alike              plaintext enciphered WITHOUT doubled-letter
+                                     units (every letter its own unit; a doubled
+                                     letter is the same token twice under the
+                                     repeat rule) while the HYPOTHESIS keeps the
+                                     language's top-5 doubled units — POSITIVE
+                                     whose decoder has 5 spare unit slots the
+                                     cipher never uses (hypothesis mismatch)
   mixed/<lang>+<other>/Alike         80 % <lang> with a 20 % block of
                                      <other> quoted in the middle (block
                                      boundaries in ``truth.sections``),
@@ -72,6 +79,8 @@ SHAPES = {"Alike": (14000, 5200), "Blike": (30000, 7200)}
 MIX_OTHER = {"german": "latin", "latin": "german", "italian": "latin"}
 MIX_FRAC = 0.20
 DIRTY_SEVERITIES = {"s05": 0.05, "s10": 0.10}
+NODOUBLE_SHAPES = ("Alike",)
+CONTROLS = ("shuffled", "voynichesque", "dirty", "mixed", "nodouble")
 
 
 def battery_dir(root=None) -> Path:
@@ -108,7 +117,8 @@ def dirty_plain(plain: np.ndarray, severity: float, rng) -> tuple[np.ndarray, di
 def stage_prepare(args):
     from diff_voyn.heads.synth import HeldoutSampler
     from diff_voyn.corpus.splits import load_splits
-    from diff_voyn.heads.wordhom import language_targets
+    from diff_voyn.heads.ngram import A
+    from diff_voyn.heads.wordhom import UnitTargets, language_targets
     from diff_voyn.vms.controls import (
         _letters_to_text,
         _rng,
@@ -124,6 +134,7 @@ def stage_prepare(args):
     out_dir.mkdir(parents=True, exist_ok=True)
     manifest = []
     langs = args.langs or list(LANGS)
+    controls = set(args.controls or CONTROLS)
 
     def emit(control, inst):
         fname = re.sub(r"[^A-Za-z0-9_]+", "_", inst["name"]) + f"_{inst['kind']}.json"
@@ -160,17 +171,20 @@ def stage_prepare(args):
             # shuffled negative (same key generator as the positive)
             rng = _rng("battery-shuffled", args.seed, lang, shape)
             plain = rng.permutation(sample_long(smp, ln, rng))
-            emit(
-                "shuffled",
-                wordhom_instance(
-                    f"shuffled/{lang}/{shape}",
-                    plain,
-                    targets,
-                    rng,
-                    dict(base, shape=shape, source_language=lang),
-                    n_types=nt,
-                ),
-            )
+            if "shuffled" in controls:
+                emit(
+                    "shuffled",
+                    wordhom_instance(
+                        f"shuffled/{lang}/{shape}",
+                        plain,
+                        targets,
+                        rng,
+                        dict(base, shape=shape, source_language=lang),
+                        n_types=nt,
+                    ),
+                )
+            if "voynichesque" not in controls:
+                continue
             # voynichesque negative at the shape's token count: the generator
             # yields ~0.5 tokens per source letter, so source ≈ 2 × tokens
             rng = _rng("battery-voynichesque", args.seed, lang, shape)
@@ -203,9 +217,28 @@ def stage_prepare(args):
                 )
             inst["truth"]["voyn_trial"] = k
             emit("voynichesque", inst)
+        # no-doubled-unit positives: the cipher has letter units only, the
+        # hypothesis (and hence truth.bigrams, the decode's unit space) keeps
+        # the language's doubled units; the letter-space truth key is valid
+        # in that space, and doubled letters are repeat-rule token repeats
+        for shape in NODOUBLE_SHAPES if "nodouble" in controls else ():
+            ln, nt = SHAPES[shape]
+            rng = _rng("battery-nodouble", args.seed, lang, shape)
+            plain = sample_long(smp, ln, rng)
+            inst = wordhom_instance(
+                f"nodouble/{lang}/{shape}",
+                plain,
+                UnitTargets(()),
+                rng,
+                dict(base, shape=shape, cipher_bigrams=[]),
+                n_types=nt,
+            )
+            assert max(inst["truth"]["sym_to_unit"]) < A
+            inst["truth"]["bigrams"] = targets.as_list()
+            emit("nodouble", inst)
         # dirty positives (A-like)
         ln, nt = SHAPES["Alike"]
-        for tag, sev in DIRTY_SEVERITIES.items():
+        for tag, sev in DIRTY_SEVERITIES.items() if "dirty" in controls else ():
             rng = _rng("battery-dirty", args.seed, lang, tag)
             clean = sample_long(smp, ln, rng)
             plain, info = dirty_plain(clean, sev, rng)
@@ -228,6 +261,8 @@ def stage_prepare(args):
                 ),
             )
         # mixed positive: lang | other-block | lang, one key from lang's targets
+        if "mixed" not in controls:
+            continue
         other = MIX_OTHER[lang]
         rng = _rng("battery-mixed", args.seed, lang, other)
         n_other = int(round(MIX_FRAC * ln))
@@ -258,7 +293,11 @@ def stage_prepare(args):
                 n_types=nt,
             ),
         )
-    (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=1))
+    mp = out_dir / "manifest.json"
+    if mp.exists():  # merge: rebuilt instances replace their old entries
+        new = {m["name"] for m in manifest}
+        manifest = [m for m in json.loads(mp.read_text()) if m["name"] not in new] + manifest
+    mp.write_text(json.dumps(manifest, indent=1))
     print(len(manifest), "battery instances →", out_dir)
 
 
@@ -432,6 +471,8 @@ def main():
         help="source letters per target voynichesque token",
     )
     p.add_argument("--voyn-trials", type=int, default=12)
+    p.add_argument("--controls", nargs="*", default=None, choices=CONTROLS,
+                   help="prepare only these controls (merged into the manifest)")
     p.add_argument("--only", nargs="*", default=None)
     p.add_argument("--hyps", nargs="+", default=list(LANGS))
     p.add_argument("--workers", type=int, default=12)
