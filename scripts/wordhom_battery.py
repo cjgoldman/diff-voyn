@@ -337,6 +337,10 @@ def stage_report(args):
     root = data_root()
     bd = battery_dir(root)
     man = {m["name"]: m for m in json.loads((bd / "manifest.json").read_text())}
+    cm = root / "analysis/wordhom/controls/wordtypesall/manifest.json"
+    if cm.exists():  # positive/* cells are reused from the controls set
+        for m in json.loads(cm.read_text()):
+            man.setdefault(m["name"], m)
     runs = []
     for tag in args.run_tags:
         p = root / "analysis/altloop" / f"runs{tag}.json"
