@@ -87,16 +87,29 @@ def battery_dir(root=None) -> Path:
     return (root or data_root()) / "analysis" / "wordhom" / "battery" / "wordtypesall"
 
 
-def sample_long(sampler, length: int, rng) -> np.ndarray:
+# a held-out window whose own-language n-gram cross-entropy exceeds this is
+# not usable plaintext: the Latin held-out set holds a pharmacopoeia (drug
+# names, abbreviations, Roman-numeral doses) at 4.7 bits/char and 10 % of the
+# sampling weight; ordinary docs score 2.2–3.2. Resample instead.
+MAX_OWN_BPC = 3.6
+
+
+def sample_long(sampler, length: int, rng, lm=None, max_bpc: float = MAX_OWN_BPC) -> np.ndarray:
     """Held-out window of ``length`` letters from a doc long enough to hold it
-    (``HeldoutSampler.sample`` assumes every doc is)."""
+    (``HeldoutSampler.sample`` assumes every doc is); with ``lm`` (the
+    language's n-gram LM) windows above ``max_bpc`` bits/char are redrawn."""
     ok = [i for i, d in enumerate(sampler.docs) if len(d) >= length]
     if not ok:
         raise ValueError(f"no held-out {sampler.language} doc of >= {length} letters")
     w = sampler.weights[ok] / sampler.weights[ok].sum()
-    d = sampler.docs[ok[rng.choice(len(ok), p=w)]]
-    start = rng.integers(0, len(d) - length + 1)
-    return d[start : start + length].astype(np.int64)
+    for _ in range(50):
+        d = sampler.docs[ok[rng.choice(len(ok), p=w)]]
+        start = rng.integers(0, len(d) - length + 1)
+        win = d[start : start + length].astype(np.int64)
+        if lm is None or (bpc := lm.bits_per_char(win)) <= max_bpc:
+            return win
+        print(f"  resample {sampler.language}: window at {bpc:.2f} bits/char > {max_bpc}", flush=True)
+    raise ValueError(f"no {sampler.language} window under {max_bpc} bits/char in 50 draws")
 
 
 def dirty_plain(plain: np.ndarray, severity: float, rng) -> tuple[np.ndarray, dict]:
@@ -170,7 +183,7 @@ def stage_prepare(args):
         for shape, (ln, nt) in SHAPES.items():
             # shuffled negative (same key generator as the positive)
             rng = _rng("battery-shuffled", args.seed, lang, shape)
-            plain = rng.permutation(sample_long(smp, ln, rng))
+            plain = rng.permutation(sample_long(smp, ln, rng, ev.lms[lang]))
             if "shuffled" in controls:
                 emit(
                     "shuffled",
@@ -191,7 +204,7 @@ def stage_prepare(args):
             n_tok_target = {"Alike": 13600, "Blike": 29200}[shape]
             tpt_target = {"Alike": 4.1, "Blike": 5.5}[shape]
             src_len = int(args.voyn_src_ratio * n_tok_target)
-            src = sample_long(smp, src_len, rng)
+            src = sample_long(smp, src_len, rng, ev.lms[lang])
             # the generator's parameter draw sets tokens/type (2.8–10 across
             # seeds): pick the draw closest to the shape's tokens/type, then
             # rescale the source to hit the token count
@@ -208,7 +221,7 @@ def stage_prepare(args):
             _, k, inst = min(trials, key=lambda t: t[:2])
             scale = n_tok_target / inst["n_stream"]
             if abs(scale - 1) > 0.05:
-                src2 = sample_long(smp, int(src_len * scale), _rng("battery-voynichesque", args.seed, lang, shape, "rescale"))
+                src2 = sample_long(smp, int(src_len * scale), _rng("battery-voynichesque", args.seed, lang, shape, "rescale"), ev.lms[lang])
                 inst = voynichesque_wordtypes_instance(
                     f"voynichesque/{lang}/{shape}",
                     _letters_to_text(src2),
@@ -224,7 +237,7 @@ def stage_prepare(args):
         for shape in NODOUBLE_SHAPES if "nodouble" in controls else ():
             ln, nt = SHAPES[shape]
             rng = _rng("battery-nodouble", args.seed, lang, shape)
-            plain = sample_long(smp, ln, rng)
+            plain = sample_long(smp, ln, rng, ev.lms[lang])
             inst = wordhom_instance(
                 f"nodouble/{lang}/{shape}",
                 plain,
@@ -240,7 +253,7 @@ def stage_prepare(args):
         ln, nt = SHAPES["Alike"]
         for tag, sev in DIRTY_SEVERITIES.items() if "dirty" in controls else ():
             rng = _rng("battery-dirty", args.seed, lang, tag)
-            clean = sample_long(smp, ln, rng)
+            clean = sample_long(smp, ln, rng, ev.lms[lang])
             plain, info = dirty_plain(clean, sev, rng)
             emit(
                 "dirty",
@@ -268,8 +281,8 @@ def stage_prepare(args):
         n_other = int(round(MIX_FRAC * ln))
         n_a = (ln - n_other) // 2
         n_b = ln - n_other - n_a
-        own = sample_long(smp, n_a + n_b, rng)
-        blk = sample_long(samplers[other], n_other, rng)
+        own = sample_long(smp, n_a + n_b, rng, ev.lms[lang])
+        blk = sample_long(samplers[other], n_other, rng, ev.lms[other])
         plain = np.concatenate([own[:n_a], blk, own[n_a:]])
         sections = [
             [0, n_a, lang],
