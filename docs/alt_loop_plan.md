@@ -872,7 +872,38 @@ manuscript and "no language" depends on how the key was obtained; the
 honest control for any manuscript number is a same-shape negative through
 the same key search.
 
-### 10.4 Carry forward
+### 10.4 Reverse mismatch — `revdouble` (2026-08-30, German only)
+
+The cipher uses the language's top-5 doubled units, the hypothesis has
+letters only (`truth.hyp_bigrams = []`, honoured by the solver, the loop and
+the judge; the judge's `truth` row is the *projected* truth — doubled-unit
+types mapped to their base letter — since the exact key is unrepresentable).
+German A-like, 13 515 tokens / 3 258 types (4.1 per type); 148 types
+(≈ 2.4 % of occurrences) sit on doubled units, so the floor is SER **0.035**
+(485 unrecoverable second letters) and the true text violates the
+letter-only repeat rule 19 times.
+
+| key | SER | margin | rank | called |
+|---|---|---|---|---|
+| n-gram start | 0.673 | 0.47 | ge | no |
+| wild | 0.170 | 1.23 | ge | no |
+| anneal (80/80 rounds, 48 accepted) | **0.098** | **1.88** | ge>la>it | **YES** |
+| projected truth | 0.035 | 2.11 | ge | YES |
+
+Reading: omitting units the cipher does use is *not* free, unlike the
+forward mismatch — the residual is 0.098 against 0.027 (nodouble) and 0.05
+(matched positive), the wild stage starts from a smaller unit space (start
+SER 0.67 rather than 0.75) but the anneal is again budget-bound. The damage
+concentrates where expected: 73 of the 148 doubled-unit types are still
+wrong after the anneal (their tokens decode to one letter and break the
+repeat-rule pattern the objective relies on) against 5.5 % of occurrences
+among ordinary letter types. The cell is nevertheless **called** (margin
+1.88 with German's headroom); for Latin/Italian, whose ceilings are 2.0 /
+1.6, the same 0.06–0.07 residual penalty would likely cost the call.
+Latin/Italian instances are built (`revdouble/{latin,italian}/Alike`) and
+not run.
+
+### 10.5 Carry forward
 
 1. Anneal budget: use patience-terminated runs (e.g. 200 rounds / patience
    10) on perturbed positives; the 80-round cap cost at least two solves.
@@ -881,7 +912,7 @@ the same key search.
    transcription noise is a decipherment the frozen rule cannot call.
 3. Seeds: negatives are one seed each; the positive/negative gap is large
    enough that this is fine for the negatives, not for borderline positives.
-4. Build the reverse `nodouble` mismatch if the doubled-unit hypothesis is
-   to be argued either way.
+4. Run `revdouble` for Latin/Italian (built, unsolved) if the doubled-unit
+   hypothesis is to be argued for the Romance languages.
 5. Latin held-out set: the pharmacopoeia document should be excluded (or
    down-weighted) at the next corpus version.

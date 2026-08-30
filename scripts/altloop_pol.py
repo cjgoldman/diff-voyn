@@ -38,11 +38,15 @@ from diff_voyn.heads.posterior import (
 )
 from diff_voyn.heads.rung2_homophonic import HomophonicHead
 from diff_voyn.heads.wordhom import (
+    UnitTargets,
     WordHomophonicHead,
     adjacency,
     expand_units,
+    hypothesis_targets,
+    project_key,
     rule_violations,
     unit_ser,
+    units_suffix,
 )
 
 # -- cells --------------------------------------------------------------------
@@ -162,8 +166,11 @@ class WHCell:
         self.adj = adjacency(self.symbols, self.pos)
         tr = inst.get("truth", {})
         self.n_sym = int(inst["n_symbols"])
-        self.head = WordHomophonicHead(ng, seed=args.seed)
-        self.targets = self.head.targets_for(hyp)
+        # hypothesis unit space: the instance's override (revdouble) or the
+        # --units spec (d5 default / d5b20 doubles+bigrams variant)
+        self.units = getattr(args, "units", None)
+        self.targets = hypothesis_targets(ng, hyp, units=self.units, inst=inst)
+        self.head = WordHomophonicHead(ng, seed=args.seed, targets=self.targets)
         # battery cells (scripts/wordhom_battery.py): negatives carry no key
         # and cross-language cells a key in another hypothesis' unit space —
         # type-level truth only when the hypothesis is the generating one
@@ -174,8 +181,11 @@ class WHCell:
             np.asarray(tr["plain_ids"], dtype=np.int64) if "plain_ids" in tr else None
         )
         if self.has_truth:
-            self.true_map = np.asarray(tr["sym_to_unit"], dtype=np.int64)
-            assert self.targets.as_list() == tr["bigrams"], "targets mismatch"
+            # the cipher's key in the hypothesis' unit space (identity when
+            # the spaces coincide; units the hypothesis lacks -> first letter)
+            self.true_map = project_key(
+                tr["sym_to_unit"], UnitTargets.from_list(tr["bigrams"]), self.targets
+            )
         else:
             self.true_map = None
         self.start = np.asarray(start_map, dtype=np.int64)
@@ -343,7 +353,11 @@ def build_battery_cells(args, ng, ev):
     bat = wd / "battery/wordtypesall"
     man = {m["name"]: m for m in json.loads((bat / "manifest.json").read_text())}
     solves = []
-    for fn in ("battery/battery_solves.json", "controls_solves.json"):
+    suf = units_suffix(getattr(args, "units", None))
+    # a non-default unit set has its own solves file (the positives included);
+    # the default falls back to the Phase-6 controls solves for positive/*
+    files = [f"battery/battery_solves{suf}.json"] + ([] if suf else ["controls_solves.json"])
+    for fn in files:
         if (wd / fn).exists():
             solves += json.loads((wd / fn).read_text())["instances"]
     cells = []
@@ -548,6 +562,7 @@ def stage_run(args, cells, log, out_dir):
                         "start": start_name,
                         "seed": seed,
                         "seconds": time.time() - t0,
+                        **({"units": c.units} if getattr(c, "units", None) else {}),
                         **info,
                     }
                     res.append(rec)
@@ -650,6 +665,12 @@ def main():
         help="cells from --cells NAME:HYP over the wordhom battery (scripts/wordhom_battery.py)",
     )
     p.add_argument("--cells", nargs="*", default=[])
+    p.add_argument(
+        "--units",
+        default=None,
+        help="wordhom unit-set spec: d5 (default) or d5b20 (doubles + top-20 bigrams); "
+        "selects battery_solves<_units>.json for the starts",
+    )
     p.add_argument("--tag", default="")
     p.add_argument("--deep", action="store_true")
     args = p.parse_args()

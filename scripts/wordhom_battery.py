@@ -16,6 +16,16 @@ Instances (all ``wordtypesall``, one per language and shape; ``Alike`` =
                                      5 % / 10 % per character) enciphered
                                      under the clean key — POSITIVE whose
                                      truth is itself noisy
+  revdouble/<lang>/Alike             cipher WITH the doubled-letter units but the
+                                     hypothesis (truth.hyp_bigrams) letters-only —
+                                     POSITIVE whose truth key is representable only
+                                     as a projection (reverse of nodouble)
+  bigram/<lang>/Alike                cipher over letters + top-5 doubled letters +
+                                     top-20 non-doubled bigrams (unit spec d5b20,
+                                     truth.cipher_units) — the matched POSITIVE of
+                                     the doubles+bigrams decoder variant (run it
+                                     under --units d5b20; under the default d5 it
+                                     is the reverse mismatch, truth projected)
   nodouble/<lang>/Alike              plaintext enciphered WITHOUT doubled-letter
                                      units (every letter its own unit; a doubled
                                      letter is the same token twice under the
@@ -38,6 +48,12 @@ Stages (artifacts under DATA_ROOT/analysis/wordhom/battery/):
             battery_solves.json (the loop's stuck starts)
   report    gather the loop's runs (analysis/altloop/runs<tag>.json) and the
             judge's verdicts (judge_at_ser<tag>.json) into one table
+
+The decoder's unit set is a run-time choice (``--units``, heads.wordhom
+``parse_units``): ``d5`` (default) or ``d5b20`` (doubles + top-20 bigrams).
+A non-default spec solves into ``battery_solves_<units>.json`` (positives from
+the Phase-6 controls included when ``--only`` names them) and the loop/judge
+read that file with the same ``--units``.
 
 Usage:
   uv run python scripts/wordhom_battery.py --stage prepare
@@ -80,7 +96,8 @@ MIX_OTHER = {"german": "latin", "latin": "german", "italian": "latin"}
 MIX_FRAC = 0.20
 DIRTY_SEVERITIES = {"s05": 0.05, "s10": 0.10}
 NODOUBLE_SHAPES = ("Alike",)
-CONTROLS = ("shuffled", "voynichesque", "dirty", "mixed", "nodouble")
+BIGRAM_UNITS = "d5b20"
+CONTROLS = ("shuffled", "voynichesque", "dirty", "mixed", "nodouble", "revdouble", "bigram")
 
 
 def battery_dir(root=None) -> Path:
@@ -131,7 +148,7 @@ def stage_prepare(args):
     from diff_voyn.heads.synth import HeldoutSampler
     from diff_voyn.corpus.splits import load_splits
     from diff_voyn.heads.ngram import A
-    from diff_voyn.heads.wordhom import UnitTargets, language_targets
+    from diff_voyn.heads.wordhom import UnitTargets, language_targets, segment_units
     from diff_voyn.vms.controls import (
         _letters_to_text,
         _rng,
@@ -249,6 +266,47 @@ def stage_prepare(args):
             assert max(inst["truth"]["sym_to_unit"]) < A
             inst["truth"]["bigrams"] = targets.as_list()
             emit("nodouble", inst)
+        # reverse mismatch: the cipher USES the doubled units, the hypothesis
+        # (truth.hyp_bigrams) has letters only — the truth key is representable
+        # only as its projection (doubled-unit types -> the base letter)
+        for shape in NODOUBLE_SHAPES if "revdouble" in controls else ():
+            ln, nt = SHAPES[shape]
+            rng = _rng("battery-revdouble", args.seed, lang, shape)
+            plain = sample_long(smp, ln, rng, ev.lms[lang])
+            inst = wordhom_instance(
+                f"revdouble/{lang}/{shape}",
+                plain,
+                targets,
+                rng,
+                dict(base, shape=shape),
+                n_types=nt,
+            )
+            inst["truth"]["hyp_bigrams"] = []
+            emit("revdouble", inst)
+        # doubles + bigrams positive: the cipher's units are the d5b20 set
+        # (letters, top-5 doubled letters, top-20 non-doubled bigrams); the
+        # hypothesis is whatever --units the run uses (d5b20 = matched)
+        for shape in NODOUBLE_SHAPES if "bigram" in controls else ():
+            ln, nt = SHAPES[shape]
+            rng = _rng("battery-bigram", args.seed, lang, shape)
+            plain = sample_long(smp, ln, rng, ev.lms[lang])
+            big = language_targets(ev, lang, units=BIGRAM_UNITS)
+            assert big.bigrams[: len(targets.bigrams)] == targets.bigrams
+            # bigram units absorb ~25 % of the letters into fewer tokens: scale
+            # the key so tokens per type (the binding variable) matches the d5
+            # cipher of the same plaintext rather than the letter count
+            n_tok_big = len(segment_units(plain, big))
+            n_tok_d5 = len(segment_units(plain, targets))
+            nt_big = round(nt * n_tok_big / n_tok_d5)
+            inst = wordhom_instance(
+                f"bigram/{lang}/{shape}",
+                plain,
+                big,
+                rng,
+                dict(base, shape=shape, cipher_units=BIGRAM_UNITS, n_types_d5=nt),
+                n_types=nt_big,
+            )
+            emit("bigram", inst)
         # dirty positives (A-like)
         ln, nt = SHAPES["Alike"]
         for tag, sev in DIRTY_SEVERITIES.items() if "dirty" in controls else ():
@@ -324,9 +382,27 @@ def battery_paths(root=None):
     return [d / m["file"] for m in json.loads((d / "manifest.json").read_text())]
 
 
+def control_positive_paths(root=None):
+    """The Phase-6 wordhom controls' positive/* instances (reused by the
+    battery as B-like positives and cross-language cells)."""
+    d = (root or data_root()) / "analysis/wordhom/controls/wordtypesall"
+    if not (d / "manifest.json").exists():
+        return []
+    return [
+        d / m["file"]
+        for m in json.loads((d / "manifest.json").read_text())
+        if m["name"].startswith("positive/")
+    ]
+
+
 def stage_solve(args):
+    from diff_voyn.heads.wordhom import units_suffix
+
     jobs = []
-    for p in battery_paths():
+    # positives are solved here only when --only names them explicitly (the
+    # default unit set already has them in controls_solves.json)
+    paths = battery_paths() + (control_positive_paths() if args.only else [])
+    for p in paths:
         rec = instance_record(p)
         if args.only and not any(o in rec["name"] for o in args.only):
             continue
@@ -337,6 +413,7 @@ def stage_solve(args):
             n_windows=1,
             w5=args.w5,
             restarts={WORDHOM: args.restarts},
+            units=args.units,
         )
         for j in js:
             j["sa_steps"] = args.sa_steps
@@ -346,10 +423,11 @@ def stage_solve(args):
         "restarts": args.restarts,
         "sa_steps": args.sa_steps,
         "n_windows": 1,
+        "units": args.units,
     }
     run_solves(
         jobs,
-        battery_dir().parent / "battery_solves.json",
+        battery_dir().parent / f"battery_solves{units_suffix(args.units)}.json",
         workers=args.workers,
         settings=settings,
         fresh=args.fresh,
@@ -359,35 +437,40 @@ def stage_solve(args):
 # -- report --------------------------------------------------------------------
 
 
-def _section_ser(inst, final_map):
+def _section_ser(inst, final_map, hyp_targets=None):
     """Letter SER inside each ``truth.sections`` block (mixed instances):
     the decode is aligned to the plaintext by the truth's unit boundaries, so
-    a block's SER is measured on the tokens whose true units start in it."""
+    a block's SER is measured on the tokens whose true units start in it.
+    ``hyp_targets`` is the decoder's unit space when it differs from the
+    cipher's (``final_map`` lives there)."""
     from diff_voyn.heads.wordhom import UnitTargets, expand_units, unit_ser
 
     tr = inst["truth"]
     targets = UnitTargets.from_list(tr["bigrams"])
+    hyp_targets = hyp_targets or targets
     sym = np.asarray(inst["symbols"], dtype=np.int64)
     tm = np.asarray(tr["sym_to_unit"], dtype=np.int64)
     m = np.asarray(final_map, dtype=np.int64)
     true_units = tm[sym]
     ulen = 1 + (targets.second[true_units] >= 0)
     starts = np.concatenate([[0], np.cumsum(ulen)[:-1]])
-    plain = np.asarray(tr["plain_ids"], dtype=np.int64)
     out = {}
     for s, e, lang in tr["sections"]:
         tok = np.flatnonzero((starts >= s) & (starts < e))
         if len(tok) == 0:
             continue
-        dec = expand_units(m[sym[tok]], targets)
+        dec = expand_units(m[sym[tok]], hyp_targets)
         ref = expand_units(true_units[tok], targets)
         out[f"{s}-{e}:{lang}"] = float(unit_ser(dec, ref))
     return out
 
 
 def stage_report(args):
+    from diff_voyn.heads.wordhom import hypothesis_targets
+
     root = data_root()
     bd = battery_dir(root)
+    ng = build_ngram_evaluator() if args.units else None
     man = {m["name"]: m for m in json.loads((bd / "manifest.json").read_text())}
     cm = root / "analysis/wordhom/controls/wordtypesall/manifest.json"
     if cm.exists():  # positive/* cells are reused from the controls set
@@ -407,7 +490,8 @@ def stage_report(args):
             for r in json.loads(p.read_text()):
                 judge[(r["cell"], r.get("hypothesis", r["truth_language"]), r["key"])] = r
     lines = [
-        "# Wordhom battery — wildcard→anneal pipeline on manuscript-shaped controls",
+        "# Wordhom battery — wildcard→anneal pipeline on manuscript-shaped controls"
+        + (f" (decoder unit set `{args.units}`)" if args.units else ""),
         "",
         f"generated {datetime.now(UTC).isoformat()}; runs {args.run_tags}; judge {args.judge_tags}",
         "",
@@ -445,7 +529,12 @@ def stage_report(args):
             if mi and "sections" in mi["truth"] and hyp == mi["truth"]["language"]:
                 if name not in inst_cache:
                     inst_cache[name] = json.loads((bd / mi["file"]).read_text())
-                ss = _section_ser(inst_cache[name], r["final_map"])
+                ht = (
+                    hypothesis_targets(ng, hyp, units=args.units, inst=inst_cache[name])
+                    if ng is not None
+                    else None
+                )
+                ss = _section_ser(inst_cache[name], r["final_map"], ht)
                 extra = " sections: " + ", ".join(f"{k} {v:.3f}" for k, v in ss.items())
             lines.append(
                 f"| {name} / {hyp} | {control} | {tpt} | {r['_tag']} | {r['seed']} | "
@@ -469,7 +558,7 @@ def stage_report(args):
                 f"{j['top_margin_bits']:.3f} ± {j['top_margin_uncertainty_bits']:.3f} | "
                 f"{'yes' if j['language_like'] else 'no'} | {'YES' if j['called'] else 'no'} |"
             )
-    out = bd.parent / "report.md"
+    out = bd.parent / (args.report_name or "report.md")
     out.write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
 
@@ -499,6 +588,13 @@ def main():
     p.add_argument("--sa-steps", type=int, default=2_000_000)
     p.add_argument("--run-tags", nargs="*", default=["_bat_wild", "_bat_anneal"])
     p.add_argument("--judge-tags", nargs="*", default=["_battery"])
+    p.add_argument(
+        "--units",
+        default=None,
+        help="decoder unit-set spec (d5 default, d5b20 = doubles + top-20 bigrams): "
+        "solve writes battery_solves_<units>.json; report labels the table",
+    )
+    p.add_argument("--report-name", default=None, help="report file name (default report.md)")
     args = p.parse_args()
     {"prepare": stage_prepare, "solve": stage_solve, "report": stage_report}[
         args.stage

@@ -42,8 +42,11 @@ from diff_voyn.heads.wordhom import (
     UnitTargets,
     adjacency,
     expand_units,
+    hypothesis_targets,
+    project_key,
     rule_violations,
     unit_ser,
+    units_suffix,
 )
 from diff_voyn.metrology import CALIBRATION_VERSION, CalibrationTable
 from diff_voyn.vms.apply import (
@@ -62,7 +65,7 @@ CELLS = [("positive/german/Alike", "german"), ("positive/italian/Alike", "italia
 WILD_FILES = ["runs_wild32map.json", "runs_wild96.json", "runs_anneal.json", "runs_anneal_de.json"]
 
 
-def load_cell(root, name, lang, wild_files=WILD_FILES, prefix="wild"):
+def load_cell(root, name, lang, wild_files=WILD_FILES, prefix="wild", units=None):
     wd = root / "analysis/wordhom"
     bat = wd / "battery/wordtypesall"
     man = {}
@@ -75,7 +78,9 @@ def load_cell(root, name, lang, wild_files=WILD_FILES, prefix="wild"):
             (wd / "controls/wordtypesall" / (name.replace("/", "_") + "_wordtypesall.json")).read_text()
         )
     solves = []
-    for fn in ("battery/battery_solves.json", "controls_solves.json"):
+    suf = units_suffix(units)
+    files = [f"battery/battery_solves{suf}.json"] + ([] if suf else ["controls_solves.json"])
+    for fn in files:
         if (wd / fn).exists():
             solves += json.loads((wd / fn).read_text())["instances"]
     rec = next(s for s in solves if s["instance"] == name and s["hypothesis"] == lang)
@@ -173,6 +178,7 @@ def main():
         "hypothesis is the generating language), stuck, and the finals of --run-tags",
     )
     p.add_argument("--run-tags", nargs="*", default=["_bat_wild", "_bat_anneal"])
+    p.add_argument("--units", default=None, help="wordhom unit-set spec (d5 default, d5b20)")
     args = p.parse_args()
     out_dir = root / "analysis/altloop"
     path = out_dir / f"judge_at_ser{args.tag}.json"
@@ -195,21 +201,24 @@ def main():
         args.fracs, args.rare_fracs = [], []
     else:
         cells, wild_files, prefix = CELLS, WILD_FILES, "wild"
-    from diff_voyn.heads.wordhom import language_targets
     from diff_voyn.vms.apply import build_ngram_evaluator
 
     ng = build_ngram_evaluator()
     for name, lang in cells:
         if args.only and not any(o in name for o in args.only):
             continue
-        inst, stuck, finals = load_cell(root, name, lang, wild_files, prefix)
+        inst, stuck, finals = load_cell(root, name, lang, wild_files, prefix, args.units)
         meta = _inst_meta(inst)
         tr = inst.get("truth", {})
         has_truth = tr.get("kind") == "wordhom" and tr.get("language") == lang
-        true_map = np.asarray(tr["sym_to_unit"], dtype=np.int64) if has_truth else None
         plain = np.asarray(tr["plain_ids"], dtype=np.int64) if "plain_ids" in tr else None
-        targets = (
-            UnitTargets.from_list(tr["bigrams"]) if has_truth else language_targets(ng, lang)
+        # the decoder's unit space (instance override / --units spec); the
+        # truth key is projected into it (identity when the spaces coincide)
+        targets = hypothesis_targets(ng, lang, units=args.units, inst=inst)
+        true_map = (
+            project_key(tr["sym_to_unit"], UnitTargets.from_list(tr["bigrams"]), targets)
+            if has_truth
+            else None
         )
         sym = np.asarray(inst["symbols"], dtype=np.int64)
         adj = adjacency(sym, np.asarray(inst["token_pos"], dtype=np.int64))
@@ -233,6 +242,7 @@ def main():
             r = {
                 "cell": name, "truth_language": tr.get("language"), "hypothesis": lang,
                 "control": inst.get("control", "positive"), "key": kname,
+                **({"units": args.units} if args.units else {}),
                 "ser": float(unit_ser(dec, plain)) if plain is not None else None,
                 "map_err_types": float(wrong.mean()) if has_truth else None,
                 "map_err_occ": float((occ * wrong).sum() / occ.sum()) if has_truth else None,

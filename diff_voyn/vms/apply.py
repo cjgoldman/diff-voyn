@@ -119,6 +119,7 @@ def make_jobs(
     w4: int = 500,
     w5: int = 12000,
     restarts: dict | None = None,
+    units: str | None = None,
 ) -> list[dict]:
     """Jobs for one instance (a presentation record: ``kind`` eva/boxer
     carries ``symbols`` (+ ``token_starts``), ``words`` carries ``tokens``).
@@ -161,6 +162,9 @@ def make_jobs(
                         "path": instance["path"],
                         "n_symbols": instance["n_symbols"],
                         "restarts": restarts.get(head),
+                        # wordhom unit-set spec (heads.wordhom.parse_units);
+                        # None = the default d5
+                        **({"units": units} if head == WORDHOM and units else {}),
                     }
                 )
     return jobs
@@ -332,12 +336,12 @@ def solve_job(job: dict) -> dict:
             )
         out["window_chars"] = [a_c, b_c]
     elif head == WORDHOM:
-        from ..heads.wordhom import WordHomophonicHead, expand_units
+        from ..heads.wordhom import WordHomophonicHead, expand_units, hypothesis_targets
 
         sym = np.asarray(inst["symbols"][a:b], dtype=np.int64)
         pos = np.asarray(inst["token_pos"][a:b], dtype=np.int64)
-        h = WordHomophonicHead(_EV, seed=seed)
-        targets = h.targets_for(hyp)
+        targets = hypothesis_targets(_EV, hyp, units=job.get("units"), inst=inst)
+        h = WordHomophonicHead(_EV, seed=seed, targets=targets)
         res = h.solve(
             sym,
             int(inst["n_symbols"]),
