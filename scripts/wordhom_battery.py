@@ -427,6 +427,10 @@ def stage_report(args):
         mi = man.get(name)
         tpt = f"{mi['n_stream']/mi['n_symbols']:.1f}" if mi else ""
         for r in sorted(rs, key=lambda r: (r["_tag"], r["seed"])):
+            if mi and len(r["final_map"]) != mi["n_symbols"]:
+                # run on a since-rebuilt instance (different key size): stale
+                lines.append(f"| {name} / {hyp} | {control} | {tpt} | {r['_tag']} | {r['seed']} | (stale: instance rebuilt) | | | |")
+                continue
             sm, fm = r["start_metrics"], r["final_metrics"]
             f = lambda x: "–" if x is None else f"{x:.3f}"
             j = judge.get((name, hyp, f"final:{r['_tag']}/s{r['seed']}"))
