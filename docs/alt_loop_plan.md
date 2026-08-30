@@ -738,3 +738,150 @@ latter is the "objective trap" of §7.3, which `rand-k2` also opens
 (0.000), so german t0's 0.240 optimum is a *search* trap after all; latin
 t5 remains the objective trap. Not adopted as a change to any recorded
 number; carry the round budget forward in any future loop.
+
+## 10. Manuscript-shaped control battery for the wildcard → anneal pipeline (2026-08-29/30)
+
+**Question.** §8.6 validated the wildcard → anneal loop on clean A-like
+positives only. Before an exhaustive treatment, the pipeline needs the
+controls the manuscript comparison actually rests on: negatives of the
+manuscript's shape (does the loop *invent* structure?), positives at the
+Currier-B shape, the wrong-language hypothesis, plaintext with transcription
+errors, a foreign block inside the text, and — added mid-run — a cipher that
+lacks the hypothesis' doubled-letter units. Nothing here touches the
+manuscript; the readings were fixed in `docs/wordhom_battery_restart.md`
+before any cell finished.
+
+**Instances** (`scripts/wordhom_battery.py --stage prepare|solve|report`;
+`analysis/wordhom/battery/wordtypesall/`, 24 instances + the reused
+`positive/<lang>/{Alike,Blike}` controls). Shapes: A-like 14 000 letters /
+5 200 key types (4.2–4.4 tokens per type, Currier A), B-like 30 000 / 7 200
+(5.5–5.7, Currier B). Per language (German, Latin, Italian):
+`shuffled/{Alike,Blike}` (letters permuted, then enciphered — the language's
+unigram statistics with no structure), `voynichesque/{Alike,Blike}` (pinned
+gibberish generator at the shape's token count, draw selected by
+tokens/type), `dirty/Alike_s05|_s10` (Phase-2 `TranscriptionNoise` at 5 % /
+10 % per character, enciphered under the clean key; SER measured against
+the noisy plaintext), `mixed/<lang>+<other>/Alike` (80 % host language with
+a 20 % block of the other in the middle, one key), `nodouble/Alike` (see
+below), and the cross-language cells `positive/<lang>/Alike` run under each
+*other* language's hypothesis. Every cell: n-gram MDL start → wild 96 rounds
+/ patience 10 → anneal `0,40` 80 rounds / patience 10 → Phase-6 judge
+(`scripts/judge_at_ser.py --battery`, keys `stuck`, `truth`, finals). One
+seed; seed 1 added on the three borderline positives. Chains
+`analysis/altloop/battery/chain_*.sh`, tags `_bat_{wild,anneal}_{g0,g1,g0b,l0,l1,l1b,i0,i1,x1}`,
+judge `_battery_*`, report `analysis/wordhom/battery/report.md`.
+
+**A data defect found on the way.** Two Latin instances drew the same
+held-out document — a pharmacopoeia ("pulveris ipecacuanhae … gr xii divide
+in pulveres …": drug names, abbreviations, Roman-numeral doses) at 4.66
+bits/char under the Latin LM, 10 % of the Latin held-out sampling weight
+(the other five Latin docs score 2.6–3.0, German/Italian docs 2.2–2.9). On it
+even the *true* key is judged non-language-like (margin 1.23, ranked German).
+The sampler now redraws any window above 3.6 bits/char (`MAX_OWN_BPC`,
+commit 7d4991f); the two instances were rebuilt, re-solved and rerun, and
+the stale rows purged. Any earlier study that sampled Latin held-out windows
+may have hit this document — check a Latin cell's plaintext bits/char before
+attributing a failure to "Latin is hard".
+
+### 10.1 Results (seed 0 unless stated; judge margin = structure margin of the anneal final; ceiling = margin of the true key)
+
+Negatives and wrong hypotheses — every cell NOISE:
+
+| cell | tok/type | wild → anneal margin | rank | called |
+|---|---|---|---|---|
+| shuffled A: de / la / it | 4.2–4.4 | 0.14→0.26 / 0.11→0.26 / 0.13→0.27 | noise | no |
+| shuffled B: de / la / it | 5.6–5.7 | 0.12→0.17 / 0.10→0.18 / 0.11→0.21 | noise | no |
+| voynichesque A: de / la / it | 4.4–5.0 | 0.17→0.35 / 0.18→0.37 / 0.14→0.25 | noise | no |
+| voynichesque B: de / la / it | 6.0–6.4 | 0.14→0.23 / 0.15→0.25 / 0.14→0.21 | noise | no |
+| German text under :latin / :italian | 4.1 | 0.21→0.43 / 0.17→0.39 | noise | no |
+| Latin text under :german / :italian | 4.2 | 0.30→0.44 / 0.17→0.43 | noise | no |
+| Italian text under :german / :latin | 4.2 | 0.31→0.44 / 0.29→0.48 | noise | no |
+
+The n-gram objective climbs +8–40 k nats on every one of these keys while
+the judge margin stays at 0.17–0.37 (negatives) / 0.39–0.48 (wrong
+hypothesis); the language rank is 0.000–0.012 ± 0.067 and flips between
+rows. The loop does not invent structure and does not invent its
+hypothesis language; the top of the negative band is ≈ 0.5.
+
+Positives:
+
+| cell | tok/type | SER stuck → wild → anneal | margin | ceiling | called |
+|---|---|---|---|---|---|
+| positive/german/Blike | 5.5 | 0.69 → 0.085 → **0.026** | 2.22 | 2.36 | YES |
+| positive/latin/Blike | 5.6 | 0.78 → 0.095 → **0.036** | 1.83 | 1.97 | YES |
+| positive/italian/Blike | 5.6 | 0.78 → 0.125 → **0.070** | 1.46 | 1.61 | no |
+| nodouble/german | 4.3 | 0.76 → 0.120 → **0.027** | 2.40 | 2.52 | YES |
+| nodouble/latin | 4.3 | 0.73 → 0.131 → **0.040** | 1.88 | 2.06 | YES |
+| nodouble/italian | 4.4 | 0.78 → 0.165 → **0.094** | 1.43 | 1.58 | no |
+| mixed de+la (:german) | 4.2 | 0.75 → 0.141 → **0.050** (de 0.045 / la block 0.071) | 2.13 | 2.37 | YES |
+| mixed la+de (:latin) | 4.2 | 0.76 → 0.76 → 0.64; seed 1: 0.70 → 0.27 → **0.17** (+80 rounds; la 0.13 / de block 0.33) | 0.52; 1.24 | 1.99 (ranked ge) | no |
+| mixed it+la (:italian) | 4.2 | 0.77 → 0.58 → 0.52 | 0.59 | 1.59 (ranked ge) | no |
+| dirty de 5 % | 4.2 | 0.75 → 0.60 → **0.148**; seed 1: 0.64 → 0.251 | 1.51; 1.13 | 1.95 | YES; no |
+| dirty la 5 % | 4.2 | 0.76 → 0.77 → 0.68; seed 1: 0.76 → 0.66 | 0.43; 0.41 | 1.56 | no |
+| dirty it 5 % | 4.2 | 0.76 → 0.59 → 0.45 | 0.62 | 1.22 | no |
+| dirty de / la / it 10 % | 4.2 | 0.63 / 0.74 / 0.69 | 0.44 / 0.37 / 0.46 | 1.54 / 1.06 / 0.91 | no |
+
+### 10.2 Readings
+
+- **B-like positives solve better than A-like** (0.026 / 0.036 / 0.070 vs
+  0.05 / 0.07 / 0.12 at A-like): more tokens per type outweighs the larger
+  key. The manuscript's Currier-B shape is the easier one for this pipeline.
+- **`nodouble` — a hypothesis with doubled-letter units the cipher never
+  used costs nothing.** The decoder drains the unused units by itself
+  (n-gram start 60–80 types in them, wild 40–60, anneal 6 / 10 / 27 types =
+  0.04–0.2 % of occurrences) and ends at or below the matched positive's
+  residual in every language. The reverse mismatch (cipher uses doubled
+  units, hypothesis lacks them) was not built.
+- **The structure-margin ceiling is a property of the language**: true keys
+  on clean text score 2.4–2.5 (German), 2.0 (Latin), 1.6 (Italian). Under
+  the frozen ≥ 1.5 rule that is 0.9 / 0.5 / 0.1 bits of headroom, which is
+  why solved Italian cells (SER 0.07–0.09) are never called and Latin calls
+  are narrow. Transcription noise eats it fast: truth-key margins at 5 % /
+  10 % are 1.95 / 1.54 (de), 1.56 / 1.06 (la), 1.22 / 0.91 (it) — a perfect
+  decipherment survives the rule at 10 % noise only in German and at 5 %
+  only in German and (barely) Latin.
+- **Perturbed Romance A-like positives stay in the n-gram trap.** Dirty
+  5 % Latin fails identically at two seeds (wild stage never leaves the
+  start); mixed Latin escapes at seed 1 but not seed 0; Italian dirty/mixed
+  reach 0.45–0.52. The 80-round anneal budget — set on clean A-like text,
+  where patience triggers first — is binding on these cells (62/80 and
+  53/80 rounds accepted at the end; the mixed-Latin continuation converged
+  at 0.17 with 56 more rounds). The single dirty-German seed-0 call (0.148,
+  margin 1.51) did not replicate (seed 1: 0.251, 1.13).
+- **A 20 % foreign block does not lower the ceiling but flips the
+  ranking**: the German host is called with the Latin block decoded at
+  0.071; the Latin and Italian hosts' true keys are language-like
+  (1.99 / 1.59) but ranked German at 0.006–0.019 ± 0.067. "Language-like"
+  and "which language" separate for the Romance hosts.
+- **Unsolved dirty-10 % positives judge like negatives** (0.37–0.46): a
+  stuck key on noisy real text is worth ~0.1 bits more than a stuck key on
+  gibberish.
+
+### 10.3 Where the manuscript sits (charts `analysis/plots/structure_margin_stage{1,2,3,4a,4b}*.png`)
+
+Like-for-like on the word-homophonic head (n-gram keys through this
+pipeline), the manuscript's 12 wordhom cells score 0.36–0.51 against
+negatives at 0.17–0.37 — just above, with one shared bin. Across all 72
+altloop psamp cells the manuscript spans 0.36–1.05 (median 0.74; Currier A
+0.48–0.95, Currier B 0.36–1.05), above every n-gram-key negative here
+(≤ 0.48) and every unsolved dirty-10 % positive (≤ 0.46), and ~0.45 bits
+below the call line. The Phase-6 negatives on *ELBO-polished* keys —
+shuffled ≈ 0, voynichesque + contamination 0.3–1.51 — cover the
+manuscript's whole range and reach the threshold, so the gap between the
+manuscript and "no language" depends on how the key was obtained; the
+honest control for any manuscript number is a same-shape negative through
+the same key search.
+
+### 10.4 Carry forward
+
+1. Anneal budget: use patience-terminated runs (e.g. 200 rounds / patience
+   10) on perturbed positives; the 80-round cap cost at least two solves.
+2. Report the structure margin with the per-language truth ceiling, not
+   only the binary abstention: a Latin/Italian plaintext with a few percent
+   transcription noise is a decipherment the frozen rule cannot call.
+3. Seeds: negatives are one seed each; the positive/negative gap is large
+   enough that this is fine for the negatives, not for borderline positives.
+4. Build the reverse `nodouble` mismatch if the doubled-unit hypothesis is
+   to be argued either way.
+5. Latin held-out set: the pharmacopoeia document should be excluded (or
+   down-weighted) at the next corpus version.
