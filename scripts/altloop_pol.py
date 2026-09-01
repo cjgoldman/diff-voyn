@@ -9,6 +9,15 @@
   report— tables → analysis/altloop/report.md
 
 Artifacts: DATA_ROOT/analysis/altloop/{pol1,runs}.json
+
+Since 2026-08-27 this is also the runner of the hapax-wildcard / anneal /
+control-battery work (docs/alt_loop_plan.md §8–§10). Solver convention
+(CLAUDE.md, 2026-08-31): the production wordhom solve is ``--wild`` and then
+``--wild-anneal START,END --start-from <wild tag>`` with ``--patience`` ≥ 10;
+the plain defaults (``--rounds 6 --patience 2``, ``--wild`` off) are the
+2026-08-25 proof-of-life baseline and are kept unchanged. ``--judge-accept``
+(frozen judge in the acceptance rule) was tested 2026-08-28 with no gain
+(docs/alt_loop_plan.md §8.5).
 """
 
 from __future__ import annotations

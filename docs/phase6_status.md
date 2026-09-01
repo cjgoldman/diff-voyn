@@ -1,5 +1,7 @@
 # Phase 6 — VMS application and reporting: status
 
+> **Record status (banner added 2026-09-01):** Phase 6, 2026-08-23 → 2026-08-24 (the manuscript abstains, 0/87 cells; acceptance FAIL on one P0 sub-criterion), record maintained through 2026-08-25. Still current: the frozen abstention rule (`apply.ABSTAIN_RULE`), the 87-cell result, the controls, anchors and acceptance roll-up as the frozen verdict. Superseded or annotated in place below: the first "selection bias" account of the Borg polish in §6.6 (corrected 2026-08-25, same section); the safe threshold corridor (1.26–1.48 → ≈ 1.41–1.48 against a strict negative, 2026-08-31); the voynichesque control's status (a wrong-hypothesis control, not a strict negative — the P0 FAIL was a mis-specified test, verdict left as recorded); and the carry-over list. Later manuscript work — alternating loop 72/72 NOISE (2026-08-26, `docs/altloop_vms_plan.md` §12), word-homophonic wildcard → anneal 24/24 NOISE (2026-08-29, §13), `d5b20` 8/8 NOISE (2026-08-31, `docs/wordhom_bigram_variant.md`) — confirms the abstention. **Current project position: `docs/project_status.md`.**
+
 Status record for Phase 6 of the [task breakdown](../reference_docs/Diffusion%20Model%20Training%20-%20Task%20Breakdown.md)
 (design §8 R5, §9; the Phase-5 carry-overs in `docs/phase5_status.md`).
 Started 2026-08-23 after Gate G5. Every number below is produced by the
@@ -171,6 +173,11 @@ pseudo-words (`ersti`, `wunam`, `accp`, …), not by producing German.
    non-decipherment, which is why acceptance is not evidence), and the pure
    ELBO pick differed from the MDL pick in 26 of 87 cells — the
    degeneracy the choice-bits term exists to charge for.
+   *[Note added 2026-09-01: see the 2026-08-25 correction in §6.6 — these
+   polished keys ran with the choice-bits term in the polish objective,
+   which is now disallowed by default; their verdict is unaffected
+   (pre-polish margins 0.83–0.84, post-polish 1.05–1.11, both far below
+   1.5).]*
 
 ## 6.3 — Negative-control battery (39 instances, 309 solves, 309 scored cells)
 
@@ -197,6 +204,21 @@ only to show the sensitivity: **the rule is not re-tuned after seeing the
 data**, which is the entire point of freezing it, and the VMS verdict does
 not depend on the choice — see below.
 
+*[Re-classification 2026-08-31 (`docs/voynichesque_nocontent_restart.md`,
+`analysis/phase6/controls_nocontent/report.json`; `docs/project_status.md`
+§5 item 6): `voynichesque` is generated from real held-out text. Its
+strict-negative twins — same generator, seeds and alphabets on a
+letter-shuffled source — through this identical pipeline abstain 9/9
+(0/66 cells language-like). The homophonic twin scores lower than its
+real-text partner on all 27 pairs (Δ −0.27 mean, range −0.39…−0.16; real
+0.85–1.51 → twin 0.55–1.24); sub1to1 Δ −0.02 and naibbe Δ +0.02 are pure
+glyph grammar. The single miss above (italian t1: 1.43 / 1.51 / 1.50 across
+its three cells) deflates to 1.15 / 1.24 / 1.14. Maximum twin margin 1.40.
+Reading: real-text voynichesque is a wrong-hypothesis control, not a strict
+negative, and the > 0.95 bar was tested on a non-negative. The FAIL above
+stands as the frozen-rule outcome; this is a re-classification of the
+control, not a pass.]*
+
 **The number that matters for the manuscript.** The whole VMS table's
 structure margins span **0.04 – 1.25**, i.e. *every one of the 87 VMS cells
 is below every one of the nine true decipherments* (1.49–2.48) and inside
@@ -204,6 +226,11 @@ the band of the structured-gibberish and out-of-inventory controls. Any
 threshold between 1.26 and 1.48 abstains on the whole manuscript and on no
 positive control. The manuscript's best decode behaves like `voynichesque.py`
 output, not like a decipherment.
+*[Note added 2026-09-01: the 1.26–1.48 corridor is stated against this
+battery, whose gibberish row is content-inflated (previous note). Strict
+gibberish — the letter-shuffled-source twins — reaches 1.40, so the corridor
+that is also safe against a strict negative is ≈ 1.41–1.48. The manuscript
+(≤ 1.25) is below both. `docs/project_status.md` §5 item 7.]*
 
 **Contamination detail** (MDL top-1 language, abstention ignored): Dutch →
 italian 2 / german 1; English → latin 2 / italian 1; French → italian 3;
@@ -314,7 +341,10 @@ sweeps), and the single confirmation at budget 64 compares only the final
 map against the start map — it cannot undo a chain of six individually
 biased moves. **Carry-over: the discrete outer tier needs a per-move
 confirmation at full budget (or a bias-corrected selection rule) before it
-is used on anything larger than the rung-2 synthetics.**
+is used on anything larger than the rung-2 synthetics.** *[Superseded
+2026-08-25 — resolved in the next paragraph: the dominant cause is the
+choice-bits term in the polish objective, not selection bias;
+`docs/race_polish_plan.md` §7; `docs/project_status.md` §5 item 4.]*
 
 **Post-Phase-6 correction (2026-08-25, `docs/race_polish_plan.md` §7).**
 The winner's-curse account above is incomplete. Re-running the polish on
@@ -391,7 +421,9 @@ against the actual letter streams rather than a threshold.
    Latin homophonic cipher (0.25 bits/symbol, the largest margin in the
    phase) while failing its SER target under our alignment protocol; and
    `elbo_polish`, the Phase-5 outer tier, actively degrades a 55-symbol
-   real cipher through selection bias.
+   real cipher through selection bias. *[Superseded 2026-08-25: mostly
+   through the choice-bits term in the polish objective — §6.6 correction
+   paragraph; an ELBO-only polish holds Borg.]*
 5. **The abstention rule is very nearly a separating statistic but not
    quite**: one voynichesque instance at 1.51 and one true decipherment at
    1.49 straddle the frozen 1.5, so the battery has one error on each side
@@ -410,11 +442,18 @@ against the actual letter streams rather than a threshold.
 - **Abstention**: the margin's overlap band is now measured on 39 real
   instances — a larger control battery (or a length-matched margin
   normalization) would place the threshold on firmer ground.
+  *[Partly done as of 2026-09-01: a manuscript-shaped battery for the
+  word-homophonic solver of record (12 negatives + 6 cross-language, all
+  NOISE ≤ 0.48; `docs/alt_loop_plan.md` §10, 2026-08-29/30) and the
+  strict-negative voynichesque twins through this pipeline (ceiling 1.40,
+  9/9 abstain; `docs/voynichesque_nocontent_restart.md`, 2026-08-31).
+  Length-matched margin normalisation: not started.]*
 - **Presentations**: EVA character tokenization is one choice among
   several (glyph units, benched gallows as single symbols); a
   tokenization sweep is the obvious sensitivity study the abstention
-  verdict deserves.
-- **4.7** (25M seed replication) is still paused.
+  verdict deserves. *[Still open as of 2026-09-01; never started.]*
+- **4.7** (25M seed replication) is still paused. *[Still paused as of
+  2026-09-01, resumable per `docs/phase4_status.md` §4.7.]*
 
 ## Acceptance roll-up
 
@@ -452,3 +491,11 @@ protocol, and BnF fr2988 unavailable. The manuscript result itself (6.1,
 6.2) passes every check and does not depend on the failing bar: any
 threshold in 1.26–1.48 abstains on the whole manuscript while abstaining on
 no positive control.
+
+*[Note added 2026-09-01: the failing P0 sub-criterion was re-classified on
+2026-08-31 — the 1.51 voynichesque instance is content-inflated (its
+strict-negative twin scores 1.24; strict negatives abstain 9/9 with a
+ceiling of 1.40), so the bar was tested on a non-negative. The verdict above
+is not re-tuned and stands as the frozen-rule outcome; the corridor safe
+against a strict negative is ≈ 1.41–1.48. See §6.3 notes and
+`docs/project_status.md` §1 "Phase-6 acceptance".]*

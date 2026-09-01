@@ -1,6 +1,17 @@
 # Plan — alternating n-gram ↔ diffusion key search (proof of life)
 
-Status: **PLAN 2026-08-25, not yet run.** Follow-on to `docs/race_polish_plan.md`
+> **Record status (banner added 2026-09-01):** running log of the post-Phase-6 word-homophonic solver development, 2026-08-25 → 2026-08-30 (results §7–§10 appended in date order below a plan, §1–§6a, written 2026-08-25).
+> Still current: §8.6 (wildcard → anneal, the **solver of record**), §8.7 (judge vs SER), §10 (manuscript-shaped control battery); the §10.5 carry-forward items are all still OPEN. Superseded: the plan header's "not yet run"; every statement that the judge in the acceptance rule is "the lever" / "the only change these traps respond to" (§7.3 (2), §7.7 (2), §8, §8.2, end of §8.4, §8.5 last sentence, §8.7 consequence) — tested 2026-08-28 in §8.5 with no gain; the traps were broken by the wildcard objective (§8.4) and the anneal (§8.6); §7.3's "german t0 is an objective trap" (§9.1: a search trap). §8.7 judged the *pre-anneal* keys — the anneal finals are called for German and Latin (§10.1 A-like table). **Current project position: `docs/project_status.md`.**
+
+## 0. Current state (2026-09-01) and table of contents
+
+- **Solver of record** (word-homophonic cells): hapax-wildcard n-gram objective → anneal re-admission of the wildcards → post-all diffusion-guided loop, patience ≥ 10 (§8.4–8.6): `scripts/altloop_vms.py --wild`, then `--wild-anneal 0,40 --patience 10 --rounds 80 --start-from <wild tag>`. Plain multi-restart SA (`WordHomophonicHead.solve`) is the baseline arm only.
+- **Findability wall by solver stage** (tokens per type at which a 30-unit synthetic key is recovered): plain SA ≥ 8 (`docs/wordhom_study.md` §3.1) → §7 posterior re-seeding 6.6 → §8.4 wildcard objective A-like 4.1–4.4 to SER 0.13–0.24 → §8.6 anneal A-like to 0.05 / 0.07 / 0.12 (German and Latin **called**, Italian not) — **≈ 4 overall**; ~3.5 fails at every stage. Manuscript: Currier A 3.0 (below the wall), Currier B 4.6 (inside it, still NOISE). The synthetic "A-like/B-like" cells are 4.1–4.4 / 5.5–5.7 tokens per type with ~45 % hapax types, not the manuscript's 3.0 / 4.6 with 69–75 %.
+- **Battery (§10, 2026-08-29/30)**: 12 negatives + 6 cross-language cells all NOISE ≤ 0.48; B-like positives German 0.026 (margin 2.22, called), Latin 0.036 (1.83, called), Italian 0.070 (1.46, not called; truth ceiling 1.61); `nodouble` costs nothing; `revdouble` German still called; dirty-10 % truth ceilings 1.54 / 1.06 / 0.91.
+- **Manuscript runs**: `docs/altloop_vms_plan.md` §12 (posterior loop, 72/72 NOISE, 2026-08-26) and §13 (wildcard → anneal, 24/24 NOISE, 2026-08-29); `d5b20` variant 8/8 NOISE (`docs/wordhom_bigram_variant.md`, 2026-08-31).
+- **Contents**: §1–§6 the plan (2026-08-25); §6a out of scope as planned; **§7** proof-of-life results (2026-08-25); **§8**–8.3 hapax masking, not adopted (2026-08-26/27); §8.4 hapax-wildcard objective (2026-08-27); §8.5 judge in the acceptance rule, no gain (2026-08-28); §8.6 wildcard → anneal, adopted (2026-08-28); §8.7 judge vs SER (2026-08-28); **§9** small-commitment loop, refuted (2026-08-26/27); **§10** manuscript-shaped control battery (2026-08-29/30).
+
+*[Header as written 2026-08-25 — superseded, see the banner and §0:]* Status: **PLAN 2026-08-25, not yet run.** Follow-on to `docs/race_polish_plan.md`
 §5 ("the alternating loop is a separate study"). Task lineage: 5.3 / 6.6 outer
 tier. Scope is deliberately *proof of life*: does the frozen diffusion judge
 move an n-gram search out of a local optimum it provably cannot leave on its
@@ -86,7 +97,7 @@ is loop-vs-no-loop from the same start, not a re-solve.
 | R2-bank | 6 rung-2 cells (2 per language) whose *shortlist* holds a non-basin local optimum with SER ≥ 0.2 alongside the true-basin winner | that non-basin optimum | 7.5 | reach the recorded winner's basin (SER ≤ 0.02) |
 | WH-6.7 | wordhom German 1 154 types & Italian 1 144 types, 8000 letters (`analysis/wordhom/controls_solves.json`; regenerate with the study's seeds if maps are absent) | recorded solve (SER 0.30 / 0.54) | 6.7–6.8 | SER halves; violations drop; n-gram objective up |
 | WH-5.6 | same at 1 375 / 1 383 types | recorded solve (SER 0.57 / 0.64) | 5.6–5.7 | any monotone improvement; this is the hard edge |
-| WH-4 (stretch, one cell) | German A-like (3 259 types, 14k letters, SER 0.60) | recorded solve | 4.1 | not expected — reported as the identifiability wall |
+| WH-4 (stretch, one cell) | German A-like (3 259 types, 14k letters, SER 0.60) | recorded solve | 4.1 | not expected — reported as the identifiability wall *[Superseded 2026-08-27/28: the A-like cells were solved by the wildcard objective + anneal, §8.4–8.6 (SER 0.05 / 0.07 / 0.12); `docs/project_status.md` §3.]* |
 
 Arms per cell: `M1-k4`, `M1-k8`, `M1-all`, `M2`, `control-k8`, `null`. Two
 replicate seeds (the posterior draws and the SA are both seeded). Frozen
@@ -145,12 +156,16 @@ after the fact.
 4. Report: `analysis/altloop/report.md` with the PoL table, one paragraph in
    `docs/alt_loop_plan.md` §7, `CLAUDE.md` state line.
 
-## 7. Out of scope
+## 6a. Out of scope (as planned 2026-08-25)
+
+*(renumbered 2026-09-01 from a duplicate "## 7." so that the results section below keeps the §7 number other documents cite)*
 
 VMS cells (a proof of life on synthetics must precede any manuscript run; the
 VMS regression arm belongs to the full study), rung-3/4 heads, tuning `k` /
 `mask_rate` beyond the three values above, and the manuscript-shaped wordhom
 instances beyond the single stretch cell.
+
+*[Superseded: VMS cells were run 2026-08-26 and 2026-08-29 (`docs/altloop_vms_plan.md` §12, §13 — all NOISE) and manuscript-shaped wordhom instances throughout §8–§10 below; `docs/project_status.md` §1.]*
 
 ## 7. Proof-of-life results (2026-08-25)
 
@@ -236,6 +251,8 @@ Two qualifications the plan did not anticipate:
    the acceptance rule (§5 of `race_polish_plan.md` — with the choice term
    off), which this study deliberately kept out.
 
+   *[Superseded: german t0's 0.240 optimum is a *search* trap — the `rand-k2` arm opens it at 32 rounds (§9.1 side result, 2026-08-27); latin t5 remains the objective trap. The judge in the acceptance rule was tested 2026-08-28 (§8.5) with no gain. `docs/project_status.md` §5.2, §5.10.]*
+
 Null (start at truth) under cold SA: 0–1 symbol moved on every bank/deep
 instance for every arm (PoL-3 PASS outside t5).
 
@@ -301,9 +318,11 @@ what moves the search.
    (german t0, latin t5, and the wordhom refit offset): accept on the ELBO
    with the choice term off and the race's confirmation, per
    `race_polish_plan.md` §7 — untested here by design.
+   *[Superseded 2026-08-28: tested in §8.5 — no gain. The traps were broken instead by the hapax-wildcard objective (§8.4) and the anneal (§8.6). `docs/project_status.md` §5.2.]*
 3. Before any manuscript use: a VMS regression arm (the abstention must not
    move), the wordhom 5.6-tokens-per-type and manuscript-shaped cells
    (§3's WH-5.6 / WH-4, not run), and two seeds on the wordhom cells.
+   *[Done: manuscript runs `docs/altloop_vms_plan.md` §12 (2026-08-26) and §13 (2026-08-29), abstention unmoved; the A-like (WH-4) cells §8–§8.7 and B-like cells §10.1, three seeds in §8.6.]*
 
 ## 8. Hapax-masked proposer on the high-hapax word-homophonic cells (2026-08-26)
 
@@ -358,6 +377,8 @@ option (`force_mask`, `--hapax-max`, `--hapax-mask-rate`) for a partial-mask
 sweep if the loop is ever run with the judge in the acceptance rule, which
 remains the only change these traps are expected to respond to (§7.7).
 
+*[Superseded the next day (2026-08-27) by §8.4: the hapax-*wildcard objective*, not the acceptance rule, broke these traps; the judge in the acceptance rule was then tested 2026-08-28 (§8.5) with no gain. `docs/project_status.md` §5.2.]*
+
 ### 8.1 Why: the judge's proposals are hapax-heavy but not hapax-discriminating
 
 Per-occurrence-class split of the disagreement set at the A-like stuck
@@ -400,6 +421,8 @@ moved Italian/Latin under masking was the larger perturbation of the
 frequent types, which the German start (shallower, better-judged) cannot
 absorb. Neither variant is adopted; the recommendation stands — the lever
 is the acceptance rule (judge in the loop), not the proposal set.
+
+*[Superseded 2026-08-27/28: the lever turned out to be the *objective* (hapax wildcards, §8.4, then re-admitted, §8.6); the judge in the acceptance rule gave no gain (§8.5).]*
 
 ### 8.3 Hapax-only masking (2026-08-27, `runs_hm0.json`)
 
@@ -448,6 +471,8 @@ change that reshapes the landscape enough to unstick one t0 trap, not a
 route across the A-like regime, where the frequent types are themselves
 mostly wrong.
 
+*[Revised below the same day: with 32–96 rounds and patience 6–10 the wildcard objective does cross the A-like regime (German 0.13, Latin 0.17, Italian 0.21–0.24), and the anneal (§8.6) takes it to 0.05 / 0.07 / 0.12.]*
+
 **In the alternating loop** (`altloop_pol.py --wild`, `runs_wild.json`; stuck
 start, 6 rounds, one seed; SER, post-all / psamp-all): Italian t0 0.066 / 0.067
 (plain 0.047–0.056 / 0.073, same basin); German A-like **0.482** / 0.577 (plain
@@ -481,6 +506,8 @@ residual above the reachable truth (~0.10) is an objective-level trap the
 wildcard n-gram score prefers to the truth by 0–400 nats; resolving it needs
 the judge in the acceptance rule.
 
+*[Superseded 2026-08-28: §8.5 found no gain from the judge in the acceptance rule; §8.6's re-admission of the wildcards resolved most of the residual instead (German 0.13 → 0.05, Latin 0.17 → 0.07, Italian 0.21–0.24 → 0.12).]*
+
 ### 8.5 The judge in the acceptance rule, on the residual (2026-08-28)
 
 Prerequisite holds: the frozen judge prefers the reachable truth (hapaxes
@@ -505,6 +532,8 @@ only arbitrates noise. The raw proposals themselves lower the judge's bits
 loop would collect a 0.03-bit self-consistent optimum, not the 0.10–0.15
 gap to the truth. The residual 0.13–0.24 SER is not reachable by either
 objective's single-symbol moves from here.
+
+*[Superseded the same day by §8.6: by re-admitting the wildcards it is — anneal finals 0.05 / 0.07 / 0.12.]*
 
 ### 8.6 Annealing the wildcard set (2026-08-28)
 
@@ -608,7 +637,7 @@ n-gram objective's own optimum, above the truth by 0.6–1.9k nats.
 
 ### 8.7 What the judge says at the loop's residual SER (2026-08-28, `scripts/judge_at_ser.py`, `analysis/altloop/judge_at_ser.{json,md}`)
 
-Question: the wildcard loop leaves the A-like cells at letter SER 0.13 (German) / 0.17 (Latin) / 0.21–0.24 (Italian). Does the frozen Phase-6 judge call the language there? Every key below was pushed through the exact Phase-6 full-stream scoring (13 windows × 4 replicate seeds × 3 language conditions, budget 64, paired letter-shuffled copies, `cell_from_score`, `ABSTAIN_RULE`). Keys per cell: truth, the solve's stuck start, the loop's recorded final maps (`runs_wild96.json`; German re-run once as `runs_wild32map.json`, SER 0.132 as before), and truth corrupted at controlled SER — uniformly over types (`uni@`) and rarest-types-first (`rare@`, the search's own error profile).
+Question: the wildcard loop leaves the A-like cells at letter SER 0.13 (German) / 0.17 (Latin) / 0.21–0.24 (Italian) *[clarified 2026-09-01: these are the **pre-anneal** `_wild96` / `_wild32map` keys; the §8.6 anneal finals (0.05 / 0.07 / 0.12) were judged afterwards with the same script — German called at margin 2.13–2.14 and Latin called at 1.70–1.72 on all 3 seeds, Italian not called at 1.39–1.40; `analysis/altloop/judge_at_ser.md`, tabulated in the §10.1 A-like table]*. Does the frozen Phase-6 judge call the language there? Every key below was pushed through the exact Phase-6 full-stream scoring (13 windows × 4 replicate seeds × 3 language conditions, budget 64, paired letter-shuffled copies, `cell_from_score`, `ABSTAIN_RULE`). Keys per cell: truth, the solve's stuck start, the loop's recorded final maps (`runs_wild96.json`; German re-run once as `runs_wild32map.json`, SER 0.132 as before), and truth corrupted at controlled SER — uniformly over types (`uni@`) and rarest-types-first (`rare@`, the search's own error profile).
 
 | cell | truth: plain / margin / lang margin ± unc | last **called** key | loop's final key (SER) → plain / margin / called |
 |---|---|---|---|
@@ -618,12 +647,14 @@ Question: the wildcard loop leaves the A-like cells at letter SER 0.13 (German) 
 
 Readings:
 
-1. **The structure margin is a near-linear function of SER and crosses the 1.5 threshold at SER ≈ 0.10 (German), ≈ 0.045 (Latin), and below 0.03 (Italian — the true key itself is at 1.56).** ~0.08–0.09 bits of margin per point of SER on all three cells, uniform and rare-first alike. The loop's residual (0.13–0.24) is therefore 1.3×–8× beyond what the frozen rule will call. Plain bits cross 3.0 at about the same SER (German 0.13, Latin 0.10, Italian 0.05), so both halves of the rule fail together.
+1. **The structure margin is a near-linear function of SER and crosses the 1.5 threshold at SER ≈ 0.10 (German), ≈ 0.045 (Latin), and below 0.03 (Italian — the true key itself is at 1.56).** ~0.08–0.09 bits of margin per point of SER on all three cells, uniform and rare-first alike. The loop's residual (0.13–0.24) is therefore 1.3×–8× beyond what the frozen rule will call. *[Pre-anneal keys. The anneal finals (§8.6) are called for German (SER 0.049–0.050 → margin 2.13–2.14) and for Latin (0.066–0.073 → 1.70–1.72, 3 seeds — above the ≈ 0.045 forecast from this corruption curve: search-shaped residuals are n-gram-plausible and cost the judge less than uniform corruption), not for Italian (0.119–0.122 → 1.39–1.40); `analysis/altloop/judge_at_ser.md`; `docs/project_status.md` §5.8.]* Plain bits cross 3.0 at about the same SER (German 0.13, Latin 0.10, Italian 0.05), so both halves of the rule fail together.
 2. **The language *ranking* is right at every SER, but only German's is significant.** The truth language tops all 3 conditions on all 48 non-stuck keys (flip-rate 0 everywhere) — even at SER 0.5. German's language margin stays 0.08–0.15 (uncertainty 0.067) down to SER ≈ 0.3; Latin's is 0.02–0.04 against 0.067 and Italian's 0.01–0.05 against 0.193 at *every* SER including truth, i.e. within calibration uncertainty. On the stuck starts (SER 0.64–0.76) the ranking is German-first for German, Latin-first for both Latin and Italian — the wrong-key drift to a default language, not a signal.
 3. **Error profile barely matters.** At matched SER the rare-first corruption (hapaxes wrong first) scores marginally better than uniform (German SER 0.084 rare → 1.59 vs SER 0.102 uni → 1.50), but the loop's actual final keys sit *on* the synthetic curve (German 0.132 → 1.40 between rare 0.127 → 1.34 and uni 0.152 → 1.20; Latin 0.17 → 0.99 vs rare 0.176 → 0.82 / uni 0.160 → 0.89), slightly above it because the wildcard objective's errors concentrate on rare types. No hidden benignness in the search's errors.
 4. **The Italian A-like cell is not callable even at the true key by a margin of 0.06 bits** — the same shape as the 1.49/1.51 borderline instances in the Phase-6 acceptance. The A-like Italian source text is simply harder for the judge (2.60 bits/char at truth vs 1.89 German, 2.17 Latin), so anything short of a perfect key abstains there.
 
 Consequence: to turn the wildcard loop's A-like results into *calls* the loop must reach SER ≲ 0.08 (German) / ≲ 0.04 (Latin) — the 0–400-nat objective-vs-truth gap noted in §8.4 has to close — or the judge must enter the acceptance rule (§8.5). The ranking signal that survives to SER 0.3 is a weak argument for the latter: the judge sees the right language long before it is willing to say so, but on Latin/Italian that preference is one calibration-uncertainty wide and cannot carry a decision on its own.
+
+*[Superseded 2026-08-28: the anneal (§8.6) reached it — German 0.05 called (2.13), and Latin was called at 0.07 (1.70–1.72) despite the ≲ 0.04 estimate above; Italian 0.12 not called (1.39). The judge in the acceptance rule was tested in §8.5 with no gain. `analysis/altloop/judge_at_ser.md`; `docs/project_status.md` §5.2, §5.8.]*
 
 ## 9. Small-commitment loop (2026-08-26)
 
@@ -754,8 +785,9 @@ before any cell finished.
 **Instances** (`scripts/wordhom_battery.py --stage prepare|solve|report`;
 `analysis/wordhom/battery/wordtypesall/`, 24 instances + the reused
 `positive/<lang>/{Alike,Blike}` controls). Shapes: A-like 14 000 letters /
-5 200 key types (4.2–4.4 tokens per type, Currier A), B-like 30 000 / 7 200
-(5.5–5.7, Currier B). Per language (German, Latin, Italian):
+5 200 key types (4.2–4.4 tokens per type — Currier A's letter and type *counts*;
+the manuscript itself is 3.0 tokens per type with 74 % hapax types), B-like 30 000 / 7 200
+(5.5–5.7 — Currier B's counts; the manuscript is 4.6) *(clarified 2026-09-01; originally read "(4.2–4.4 tokens per type, Currier A)" and "(5.5–5.7, Currier B)"; `docs/project_status.md` §3)*. Per language (German, Latin, Italian):
 `shuffled/{Alike,Blike}` (letters permuted, then enciphered — the language's
 unigram statistics with no structure), `voynichesque/{Alike,Blike}` (pinned
 gibberish generator at the shape's token count, draw selected by
@@ -820,6 +852,14 @@ Positives:
 | dirty la 5 % | 4.2 | 0.76 → 0.77 → 0.68; seed 1: 0.76 → 0.66 | 0.43; 0.41 | 1.56 | no |
 | dirty it 5 % | 4.2 | 0.76 → 0.59 → 0.45 | 0.62 | 1.22 | no |
 | dirty de / la / it 10 % | 4.2 | 0.63 / 0.74 / 0.69 | 0.44 / 0.37 / 0.46 | 1.54 / 1.06 / 0.91 | no |
+
+A-like positives (anneal finals of §8.6, seeds 0–2; from `analysis/altloop/judge_at_ser.md`; table added 2026-09-01 — until then these judge rows were recorded only in the `d5` reference column of `docs/wordhom_bigram_variant.md`):
+
+| cell | tok/type | SER (anneal final) | margin | ceiling | called |
+|---|---|---|---|---|---|
+| positive/german/Alike | 4.1 | 0.049–0.050 | 2.13–2.14 | 2.33 | YES |
+| positive/latin/Alike | 4.2 | 0.066–0.073 | 1.70–1.72 | 1.94 | YES |
+| positive/italian/Alike | 4.2 | 0.119–0.122 | 1.39–1.40 | 1.56 | no |
 
 ### 10.2 Readings
 

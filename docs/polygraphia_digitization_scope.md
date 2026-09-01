@@ -1,5 +1,7 @@
 # Polygraphia digitization — scope
 
+> **Record status (banner added 2026-09-01):** the plan as written on the morning of 2026-08-31, before any scan was opened. What was actually built the same day, the three scope corrections (gothic rotunda not roman type; Collange 1561 is a translation, not a reprint; within-column duplicates are real — `docs/polygraphia_status.md` §2), the provisional 41-column anchor's **false CALLS** (§4 there) and the **QUARANTINE decision** (§5 there; `CLAUDE.md`) supersede §2, §4 and §6 below: **Polygraphia must not be used as a control or anchor** in any control-set workflow. The findability figure in §6.2 is corrected in place. **Current project position: `docs/project_status.md`** (§2 row 2026-08-31, §4, §6 "Anchors / data").
+
 *2026-08-31. Context: under the "no 1:1 / 1:n glyph substitution" premise the
 pipeline's only historical anchors (Zodiac-408, Borg — both 1:n class) drop
 out, leaving the verbose tier with no real historical cipher. Trithemius's
@@ -32,7 +34,7 @@ nothing here is built.*
 | source | role |
 |---|---|
 | 1518 Basel printing (Adam Petri / Haselberg); digitized by Herzog August Bibliothek, Wolfenbüttel; further copies via Wellcome Collection ([ukbqdd75](https://wellcomecollection.org/works/ukbqdd75)) and Google Books | **primary scan** to transcribe |
-| Gabriel de Collange's French edition, *Polygraphie et vniuerselle escriture cabalistique* (Paris 1561), scanned on the [Internet Archive](https://archive.org/details/polygraphieetvni00trit) and [Wellcome](https://wellcomecollection.org/works/ndg23cgk) | **independent reprint of the tables** — cross-check copy (the tables are reprinted, not translated) |
+| Gabriel de Collange's French edition, *Polygraphie et vniuerselle escriture cabalistique* (Paris 1561), scanned on the [Internet Archive](https://archive.org/details/polygraphieetvni00trit) and [Wellcome](https://wellcomecollection.org/works/ndg23cgk) | **independent reprint of the tables** — cross-check copy (the tables are reprinted, not translated) *[corrected 2026-08-31 — the 1561 tables are a French TRANSLATION, void as a word-level cross-check; replacement pinned MDZ bsb00026190 (Frankfurt 1550): `docs/polygraphia_status.md` §2.2]* |
 | [dcode.fr Ave Maria implementation](https://www.dcode.fr/trithemius-ave-maria) (first table page only) | spot-check for the opening columns |
 | [trithemius.com bibliography](https://trithemius.com/bibliography/) | edition census; the community has **no machine-readable table set** (checked 2026-08-31; DECODE/HistoCrypt likewise — the [Polygraphia III paper](https://ceur-ws.org/Vol-3313/paper7.pdf) digitized Book III alphabets, not the Book I–II word tables) |
 
@@ -63,6 +65,9 @@ nothing here is built.*
 
 Estimated volume: ~691 columns × 24 words ≈ **16.6k short Latin words**, on
 ~90–120 printed pages of clean 1518 roman type in tabular layout.
+*[Corrected 2026-08-31 on the scans: 692 columns (384 slots Book I + 308
+Book II) on 346 table pages, set in **gothic rotunda**, not roman type — a
+medieval-print OCR model is required: `docs/polygraphia_status.md` §1, §2.1.]*
 
 1. **Layout pass**: crop each table page into column images (the tables are
    ruled; a simple projection cut suffices; manual fallback for ornamented
@@ -77,6 +82,10 @@ Estimated volume: ~691 columns × 24 words ≈ **16.6k short Latin words**, on
    - every entry is a single token from a closed morphological family per
      column (Trithemius's columns are near-paradigms: same stem or same
      part-of-speech/inflection class down a column) — flag outliers;
+     *[corrected 2026-08-31: 24 entries are NOT necessarily distinct —
+     within-column duplicate words are printed (Book I col 22 "diuitias"
+     under both o and y), so the check must allow duplicates:
+     `docs/polygraphia_status.md` §2.3]*
    - **grammatical-continuation property**: for random letter sequences,
      consecutive drawn words must parse as the running prayer; sample and
      eyeball per book section;
@@ -111,14 +120,26 @@ focused week**, parallelizable by book.
 
 ## 6. What the anchor buys once built
 
+*[Note 2026-08-31/09-01: retained as the original motivation only. The
+provisional 41-column anchor was built and run the same day; its cyclic
+cells produced the pipeline's first false CALLS (margins 1.76–1.96 at SER
+0.74–0.77, a periodic pseudo-language objective trap), the cipher is not
+representable in the wordhom key space (collisions grow with table size),
+and Polygraphia is QUARANTINED from every control workflow —
+`docs/polygraphia_status.md` §4–§5, `CLAUDE.md`. None of the items below
+is a usable asset as of 2026-09-01.]*
+
 1. **Known-truth verbose decodes at any length** (generated pairs; no
    Borg-style edition-alignment problem): judge margins of true verbose
    decipherments of all three inventory languages at manuscript lengths.
 2. **A findability contrast that mirrors the manuscript**: a message
    shorter than ~691 letters uses each column once → tokens/type ≈ 1
-   (hapax-dominated, beyond the ≥8 tok/type findability wall from
-   `docs/wordhom_study.md`); cyclic reuse (message length ≫ 691) raises
-   tokens/type continuously. The unstructured wordhom head should fail on
+   (hapax-dominated, beyond the findability wall of the unstructured wordhom
+   head — ≈ 4 tokens/type under the wildcard→anneal solver of record, ≥ 8
+   under plain SA; `docs/alt_loop_plan.md` §8, `docs/wordhom_study.md`,
+   `docs/project_status.md` §3; *corrected 2026-09-01, originally read
+   "beyond the ≥8 tok/type findability wall from `docs/wordhom_study.md`"*);
+   cyclic reuse (message length ≫ 691) raises tokens/type continuously. The unstructured wordhom head should fail on
    the former and a **table-aware positional head** (new, small: key =
    start column + advance rule; decoding is table lookup) should succeed on
    both — demonstrating the pipeline separates "unsolvable key shape" from

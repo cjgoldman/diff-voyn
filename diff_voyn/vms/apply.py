@@ -30,7 +30,9 @@ report
     Per cell: calibrated plaintext bits/char (mean ± s.e.m. over windows
     and seeds), key bits, choice bits, total per COVERED ciphertext symbol
     (the cross-head MDL comparator of §5.6) and per all ciphertext symbols
-    with uncovered symbols charged at the stream's own order-0 entropy,
+    with uncovered symbols charged at the stream's own best held-out n-gram
+    cross-entropy (``no_cipher_baselines``; order-0 entropy only as the
+    fallback when those baselines are absent — see ``cell_from_score``),
     coverage, structure margin (shuffled − decode, own condition), the
     replicate flip-rate of the language rank, the calibration margin
     uncertainty, and the abstention verdict. The abstention rule is fixed

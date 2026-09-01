@@ -47,3 +47,6 @@ fi
 
 
 echo "=== Setup complete (${DEVICE}) ==="
+
+# Repo-local git hooks (documentation coherence gate, scripts/doc_coherence_check.py)
+git -C /workspace config core.hooksPath .githooks

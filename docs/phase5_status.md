@@ -1,5 +1,7 @@
 # Phase 5 — Cipher-head integration (frozen evaluator, difficulty ladder): status
 
+> **Record status (banner added 2026-09-01):** Phase 5, 2026-08-22 → 2026-08-23 (G5 PASS). Still governing: the frozen evaluator and calibration table, the MDL-total ranking rule, the R3 negative finding (gradients never move a key), the degenerate-optimum finding, Latin as the hard search language, the ELBO as the worse judge below ~100 chars. Two later corrections annotated in place: `elbo_polish` as recorded here ran with the homophonic choice-bits term in its objective, which is now disallowed by default (2026-08-25, `docs/race_polish_plan.md` §7), and it does not repair a 55-symbol real cipher (`docs/phase6_status.md` §6.6). The carry-over list is annotated with 2026-09-01 status. **Current project position: `docs/project_status.md`.**
+
 Status record for Phase 5 of the [task breakdown](../reference_docs/Diffusion%20Model%20Training%20-%20Task%20Breakdown.md)
 (design §7.4, §8; prototyping doc §9 "the evaluator swap and delta-measurement
 protocol"). Started 2026-08-22 after Gate G4 (`docs/phase4_status.md`). The
@@ -221,7 +223,10 @@ same term is constant across candidates for bijective keys (rung 1),
 Naibbe block bijections (rung 3) and the arithmetic key (rung 4), so those
 rungs' ELBO selections are unchanged.
 
-Results table: see below once the score stage completes.
+Results: see "5.3 — results (final, with the ELBO polish)" below, after
+§5.6. *(Rewritten 2026-09-01; the sentence was a placeholder — "Results
+table: see below once the score stage completes." — left in after the
+score stage completed.)*
 
 ## 5.4 — Rung 3, Naibbe mixed unigram-bigram (DONE, acceptance PASSED)
 
@@ -522,7 +527,12 @@ mean; the literature anchors remain a Phase-6 item.
    near the key — and used that way (`elbo_polish`: batch-scored discrete
    moves, paired masks, confirmed at budget 64) it improves on the n-gram
    objective's own optimum, to the exact true key on latin t4 and below the
-   shortlist oracle on two languages at rung 2. The design's R3 hedge
+   shortlist oracle on two languages at rung 2 *[at rung-2 scale; on a
+   55-symbol real cipher (Borg, 4000-char window) the same polish degraded
+   the key 6/6 — mostly because the choice-bits term was in its objective,
+   `docs/phase6_status.md` §6.6 and `docs/race_polish_plan.md` §7
+   (2026-08-24/25); ELBO-only polishing holds it but does not repair it]*.
+   The design's R3 hedge
    ("straight-through if expectation inputs are too smooth") does not
    rescue the gradient path either; the hedge that works is discrete. This
    should go into the design doc as a revision of §8.
@@ -569,18 +579,35 @@ mean; the literature anchors remain a Phase-6 item.
   hypothesis, untested); rung 4 — shortlist only (`elbo_polish` over the
   letter-value assignment `u` with a re-decode per move is the analogue,
   untested). Soft refinement stays instrumented but is not relied on.
+  *[Status 2026-09-01: rung-2 `elbo_polish` as recorded here included the
+  choice-bits term in its objective; since 2026-08-25 polishes run on the
+  ELBO alone by default (`docs/race_polish_plan.md` §7). The rung-3
+  within-block ELBO swap polish and the rung-4 `elbo_polish`-over-`u`
+  analogue remain untested.]*
 - **VMS scale**: the rung-3/4 DPs still run the position loop in Python
   (40 min per hypothesis at 10k chars); Currier A/B streams are 10–16× that.
   Chunked parallel solves over forked workers (the rung-3 solve stage
   already shards by instance) are the first step; the DP vectorization of
   `rung4_arithmetic_design.md` §6 the second.
+  *[Status 2026-09-01: sidestepped rather than done — Phase 6 solved on
+  windows of the validated Phase-5 scale and decoded the full stream with
+  the window key (`docs/phase6_status.md` §6.1); the vectorization was not
+  done.]*
 - **Literature anchors (6.6)**: Zodiac-408 cannot be scored by this
   instrument (English); fetch Borg (Latin) and BnF fr2988 transcriptions
   and run the rung-2 pipeline with `elbo_polish` on them.
+  *[Status 2026-09-01: Zodiac-408 (n-gram tier, SER 0.0098 PASS) and Borg
+  (ranked Latin at 0.250 bits/symbol; SER 0.129/0.226 vs ≤ 0.041, not
+  like-for-like) were run in Phase 6, where `elbo_polish` with the choice
+  term degraded Borg — `docs/phase6_status.md` §6.6. BnF fr2988 remains
+  unavailable (DECODE login).]*
 - **Design-doc revisions to record**: §8 (expected-embedding refinement →
   discrete ELBO polish; straight-through does not rescue the gradient
   path), §8 R5 (complexity penalty = key bits + choice bits, ranked per
   ciphertext symbol), §7.4 (the n-gram tier keeps the KL penalty; the
   outer tier's selection is MDL).
+  *[Status 2026-09-01: never recorded in `reference_docs/`, which is
+  intentionally left byte-identical as the pre-registration record; this
+  section and `docs/project_status.md` §5–§6 carry the correction.]*
 - **4.7 is still paused** (`docs/phase4_status.md` §4.7); the GPUs are free
-  again after this phase.
+  again after this phase. *[Still paused as of 2026-09-01.]*

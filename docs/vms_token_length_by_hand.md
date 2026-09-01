@@ -1,5 +1,8 @@
 # VMS token length by scribal hand — is length a scribal choice?
 
+> **Record status (banner added 2026-09-01):** side study, 2026-08-21; complete.
+> Still current in full: token length is a Currier A/B property, not a hand property (H2 = H3 once iin/ee are collapsed; H5 is different text); §7 consequences for per-dialect scoring; §8 open items unchanged. Nothing here is superseded by the later solver work. **Current project position: `docs/project_status.md`.**
+
 **Date:** 2026-08-21 (length distributions; extended the same day with the
 transition FSM §5b and the positive control §5c) · **Status:** side-quest,
 complete · companion to

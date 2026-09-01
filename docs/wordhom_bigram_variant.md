@@ -1,5 +1,8 @@
 # Word-homophonic decoder with doubles + bigrams as units (2026-08-30/31)
 
+> **Record status (banner added 2026-09-01):** `d5b20` decoder-variant study, 2026-08-30/31; complete.
+> Still current in full (newest study of the word-homophonic track): letters-only ciphers unharmed under `d5b20` 3/3, Italian `d5` cipher hurt (0.314), a matched 48-unit key unfindable 3/3 at ~4 tokens/type, VMS 8/8 NOISE; `d5` remains the default unit spec. The `d5` reference column here was, until 2026-09-01, the only record of the A-like Latin call (0.066–0.073 → 1.70–1.72, YES, 3 seeds); it is now also tabulated in `docs/alt_loop_plan.md` §10.1. **Current project position: `docs/project_status.md`.**
+
 **Question (user, 2026-08-30).** The `nodouble` control of the battery
 (`docs/alt_loop_plan.md` §10) showed that a decoder whose unit set carries the
 language's top-5 doubled letters loses nothing on a cipher that never used

@@ -1,5 +1,14 @@
 # Phase 2 — Noise curriculum: status
 
+> **Record status (banner added 2026-09-01):** Phase 2 / Phase-B noise curriculum, 2026-08-21
+> (G2 PASS). The generators, the NULL-frame acceptance, the robustness curves and their
+> physics (front-loading, saturation, ≈ 0.5-bit frame overhead, the severity-1.0 dip) are
+> still cited as written. Superseded: "the Phase-B EMA weights are the evaluator candidates
+> going forward" — the evaluator has been `phase_c-85m-seed0/ckpt_final.pt` since G4
+> (2026-08-22); calibration **v1**, valid for Phase B as stated here, was replaced by `v3-ro`
+> (2026-08-21) and then `v3-phase_c-ro` (2026-08-22, report-only) — `docs/project_status.md`
+> §5.12. **Current project position: `docs/project_status.md`.**
+
 Status record for Phase 2 of the [task breakdown](../reference_docs/Diffusion%20Model%20Training%20-%20Task%20Breakdown.md)
 (design §7.3 and §8, requirement R2). Started 2026-08-21 after Gate G1
 (`docs/phase1_status.md`). Companion docs: `phase0_decisions.md`,
@@ -259,9 +268,18 @@ reports.) What the curriculum bought, and what it cost:
 Calibration table v1 stays valid (drift ≪ offset s.e.m.); the bound-fairness
 audit of Phase 3 (3.5) should be run on the Phase-B weights since the design
 asks for it "after every training phase".
+*[Superseded 2026-08-22: Phase B was the evaluator for Phase 3 only; the frozen evaluator
+since G4 is the joint Phase-C checkpoint `phase_c-85m-seed0/ckpt_final.pt`
+(`docs/phase4_status.md`), calibration `v3-phase_c-ro`. The 3.5 audit was run on the
+Phase-B weights as asked (`docs/phase3_fairness_audit.md`) and re-run on Phase C
+(`docs/phase4_fairness_audit.md`, `docs/phase6_fairness_audit.md`).
+`docs/project_status.md` §5.12.]*
 
 **→ Phase 3 (ELBO metrology, tasks 3.1–3.6) may start.** Carry-overs: the
 Phase-B density is broader (shuffled text −0.55 bits), so any Phase-3
 abstention threshold / negative-control margin must be measured on the
 Phase-B weights, not inferred from Phase A; per-document (3.3) reporting is
 still owed for the heterogeneous Latin held-out set.
+*[Done 2026-08-21: `docs/phase3_status.md` §3.3 (Latin between-document sd 0.276,
+`apothecary_ellis_1854` at 2.96 bits/char ranks German); the shuffled-text abstention
+margin was measured on the Phase-B weights in §3.6 there.]*

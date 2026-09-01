@@ -1,5 +1,14 @@
 # Interim Status Report — diff-voyn
 
+> **Record status (banner added 2026-09-01): HISTORICAL SNAPSHOT, 2026-08-19 (mid-Phase 1).**
+> Superseded in full by `docs/project_goals_and_progress.md` (2026-08-24, same audience) and
+> `docs/project_status.md` (2026-09-01): all phases 0–6 are complete (G0–G5 passed, Phase 6
+> finished 2026-08-24) and **the manuscript abstains** under every cipher hypothesis tried — the
+> abstract's "Germanic candidates" aspiration (§"Progress relative to the abstract") was tested
+> and is not supported. Every number, "in progress", "not yet tested", "pending" and "what comes
+> next" item below describes 2026-08-19 and has been deliberately left as written.
+> **Current project position: `docs/project_status.md`.**
+
 **Date:** 2026-08-19 · **Audience:** general / non-specialist
 
 ## What this project is trying to do

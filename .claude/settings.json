@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"${CLAUDE_PROJECT_DIR:-/workspace}\" && PY=$([ -x .venv/bin/python ] && echo .venv/bin/python || echo python3); $PY scripts/doc_coherence_check.py --hook stop",
+            "timeout": 60,
+            "statusMessage": "Checking documentation coherence…"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"${CLAUDE_PROJECT_DIR:-/workspace}\" && PY=$([ -x .venv/bin/python ] && echo .venv/bin/python || echo python3); $PY scripts/doc_coherence_check.py --hook session-start",
+            "timeout": 60,
+            "statusMessage": "Checking documentation coherence…"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,5 +1,11 @@
 # Phase 0 — Frozen decisions and data spec
 
+> **Record status (banner added 2026-09-01):** Phase 0 freeze, 2026-08-18 (G0 PASS).
+> Everything frozen here — vocab v1, corpus v1, normalizer v1, splits v1, the pinned cipher
+> generators and the VMS ingest — is still authoritative and unchanged as of 2026-09-01. The one
+> re-read statement is the "negative control" label on `voynichesque.py` in §0.7 (inline note
+> there; `docs/project_status.md` §5.6). **Current project position: `docs/project_status.md`.**
+
 Status record for Phase 0 of the [task breakdown](../reference_docs/Diffusion%20Model%20Training%20-%20Task%20Breakdown.md).
 Numbers here are produced by `scripts/build_corpora.py`, `scripts/tune_ciphers.py`,
 `scripts/ingest_vms.py`, and `scripts/g0_check.py`; re-run those to regenerate.
@@ -115,6 +121,14 @@ Idempotent; verified in `tests/test_normalize.py` and on real corpus text by
   to the VMS 0.92% token-doubling rate; tuned tables persisted under
   `DATA_ROOT/ciphers/` (persisted-determinism level).
 - **Negative control**: `voynichesque.py` (same Naibbe repo/pin).
+  *[Superseded reading 2026-08-31: the pin is unchanged, but voynichesque is not a
+  structure-free negative — it is generated from real held-out text and is a
+  type-deterministic 1–3-letter-chunk cipher whose homophonic band is content-inflated by
+  ≈ 0.27 bits/char (strict letter-shuffled-source twins score 0.55–1.24, ceiling 1.40);
+  it sits in the structure-margin overlap band and is a *wrong-hypothesis control*. The
+  Phase-6 P0 FAIL (abstention 0.89, one instance at 1.51) was a test on this non-negative —
+  see `docs/phase6_status.md`, `docs/voynichesque_nocontent_restart.md`,
+  `docs/project_status.md` §4 and §5.6.]*
 
 ## 0.8 — VMS ingest
 

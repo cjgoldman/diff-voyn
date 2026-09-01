@@ -1,5 +1,7 @@
 # Language identification of the Voynich Manuscript by trial decipherment under a frozen diffusion likelihood — Phase-6 write-up (draft)
 
+> **Record status (banner added 2026-09-01):** written 2026-08-24; every number is the frozen Phase-6 record and is unchanged. Not updated for post-Phase-6 work, except by the in-place notes below: the Borg `elbo_polish` account (cause is the choice-bits term in the polish objective, 2026-08-25, `docs/race_polish_plan.md` §7), the uncovered-symbol charge (best held-out n-gram cross-entropy, not order-0 — corrected in §5), the "two cells" sentence in §2, and the voynichesque band (content-inflated; a wrong-hypothesis control, strict-gibberish ceiling 1.40, 2026-08-31). The abstention was re-confirmed on the manuscript by three later campaigns (2026-08-26, 08-29, 08-31), all NOISE. **Current project position: `docs/project_status.md`.**
+
 *Status: exploratory, assumption-dependent. This document states what the
 instrument measured on the manuscript, under which assumptions, at which
 resolution, and what it cannot say.*
@@ -38,11 +40,20 @@ of the nine true decipherments** put through the identical pipeline
 (1.49–2.48) and inside the band of `voynichesque.py` gibberish (0.92–1.51)
 and of out-of-inventory languages under in-inventory ciphers (0.60–1.43).
 Any cut between 1.26 and 1.48 abstains on the entire manuscript and on no
-positive control.
+positive control. *[Note added 2026-09-01: the `voynichesque` band is
+generated from real held-out text and its homophonic cells are
+content-inflated by Δ −0.27 bits/char relative to strict-negative twins on a
+letter-shuffled source (27/27 pairs; 2026-08-31,
+`docs/voynichesque_nocontent_restart.md`) — it is a wrong-hypothesis
+control, not a strict negative. Strict gibberish peaks at 1.40, so the
+corridor also safe against a strict negative is ≈ 1.41–1.48; the manuscript
+(≤ 1.25) is below both. `docs/project_status.md` §5 items 6–7.]*
 
-Two cells reach clean-text-level *bits* — the homophonic head at 2.47–2.62
-bits/char — but do so the way Phase 5 showed a verbose head can on any
-stream, by finding a low-entropy mapping; §2.1 shows what those decodes
+Two rungs reach clean-text-level *bits* — the 1:1 head at 2.81–3.05 and the
+homophonic head at 2.47–2.76 bits/char (`docs/phase6_status.md` §6.2) — but
+do so the way Phase 5 showed a verbose head can on any stream, by finding a
+low-entropy mapping *(corrected 2026-09-01; originally read "Two cells reach
+clean-text-level bits — the homophonic head at 2.47–2.62 bits/char")*; §2.1 shows what those decodes
 actually look like. The two heads with real cipher grammars (Naibbe,
 arithmetic) return decodes at 3.5–4.3 bits/char, i.e. no key was found.
 
@@ -91,8 +102,15 @@ published plaintext is a corrected and expanded edition rather than a
 symbol-aligned transcription, and we drop glyph types occurring fewer than
 20 times. BnF fr2988 could not be obtained. A separate negative finding:
 the Phase-5 discrete `elbo_polish` **degrades** Borg (median page SER 0.110
-→ 0.217, 25 of 55 symbols reassigned) through selection bias over a large
-move neighbourhood — it does not transfer beyond the rung-2 synthetics.
+→ 0.217, 25 of 55 symbols reassigned) when the homophonic choice-bits term
+is part of the polish objective — the judge dislikes the moves (`e` → `z`,
++0.087 bits/char) but the choice term rewards them (−0.243); with the term
+removed the polish holds the key (SER 0.1195 → 0.1194, race; 0.1198,
+greedy) and polishes now run on the ELBO alone by default
+(`docs/race_polish_plan.md` §7, 2026-08-25) *(corrected 2026-09-01;
+originally read "through selection bias over a large move neighbourhood — it
+does not transfer beyond the rung-2 synthetics"; selection noise adds damage
+on the wrong objective but does not set the direction)*.
 Re-scoring the best VMS cells with pre-polish keys leaves the abstention
 unchanged (margins 0.83–0.84 before, 1.05–1.11 after), so the manuscript
 verdict is not an artifact of that step.
@@ -261,12 +279,16 @@ wrong-hypothesis decipherments (0.5–1.9), not for true ones (1.6–2.9).
 - Coverage — the Naibbe and arithmetic heads explain subsets of the
   manuscript (65–78% and 90–92% of symbols); totals are reported per
   covered symbol and per all symbols with uncovered symbols charged at
-  order-0 entropy.
+  the stream's own best held-out n-gram cross-entropy (order-0 entropy
+  only as a fallback; `vms/apply.py:810–818`, `docs/phase6_status.md`
+  §6.2) *(corrected 2026-09-01; originally read "charged at order-0
+  entropy")*.
 - Anchors — Borg (Latin) is the only literature anchor the frozen
   evaluator can score end-to-end; Zodiac-408 (English) is a pre-diffusion
   n-gram baseline only; BnF fr2988 was not available.
 - Single evaluator seed — the 25M seed replication (task 4.7) is paused;
-  every Phase-6 number is one 85M evaluator.
+  every Phase-6 number is one 85M evaluator. *[Still paused as of
+  2026-09-01.]*
 
 ## 6. Reproducibility
 

@@ -1,5 +1,7 @@
 # Phase 6 — bound-fairness audit (task 6.4: §5b re-run, attached to the VMS results)
 
+> **Record status (banner added 2026-09-01):** machine-generated audit snapshot of 2026-08-23 (task 6.4). Still current in full: the evaluator (`phase_c-85m-seed0`) and adopted table `v3-phase_c-ro` have not changed since, so these offsets (+0.138 / +0.013 / +0.205 bits/char, spread 0.193, report-only) and the four ESCALATED findings are the operative calibration for every number in the project. The content is the Phase-4 audit re-attached (`docs/phase6_status.md` §6.4). **Current project position: `docs/project_status.md`.**
+
 Generated 2026-08-23T14:13:55Z by `scripts/fairness_audit.py`; adopted table **v3-phase_c-ro** (`CALIBRATION_VERSION`). Offsets are `NELBO − NLL_AR` in bits/char on the full tiled held-out split (positive = diffusion bound looser than the reference's likelihood).
 
 ## Offsets by calibration table (backbone × reference tier)

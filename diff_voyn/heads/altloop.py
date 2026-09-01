@@ -6,6 +6,13 @@ polish), then the n-gram search runs a short low-temperature SA + polish
 from the rewritten key, and the round is accepted iff the **n-gram**
 penalized objective improved. The judge proposes, the n-gram disposes;
 ground truth is recorded per round but never consulted by the loop.
+
+A judge-in-acceptance variant exists (``scripts/altloop_pol.py
+--judge-accept``: accept iff the frozen judge's CRN-paired bits/char drop by
+more than a margin); tested 2026-08-28 with no gain over n-gram acceptance
+(``docs/alt_loop_plan.md`` §8.5). The tier constants ``ABSTAIN_MAX_PLAIN`` /
+``ABSTAIN_MIN_MARGIN`` below duplicate ``vms/apply.py::ABSTAIN_RULE`` and
+must be kept identical to it.
 """
 
 from __future__ import annotations

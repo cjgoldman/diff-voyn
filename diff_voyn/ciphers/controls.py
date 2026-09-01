@@ -1,7 +1,14 @@
 """Negative control: voynichesque.py (task 0.7; consumed by 4.3 / 6.3).
 
-Voynich-like structured gibberish with no recoverable plaintext — the system
-must abstain on it. Wraps the pinned upstream script (same repo as naibbe_v2).
+Voynich-like structured gibberish generated from REAL held-out text — its
+token types deterministically encode 1–3-letter plaintext chunks, so it is a
+wrong-hypothesis control (partial decode of real language) on which the
+system must abstain, NOT a strict negative: its homophonic-head structure
+margins are content-inflated by ≈ 0.27 bits/char relative to letter-shuffled
+source twins (``voynichesque_nocontent``, 2026-08-31,
+docs/project_status.md §5.6). Corrected 2026-09-01; originally read
+"structured gibberish with no recoverable plaintext". Wraps the pinned
+upstream script (same repo as naibbe_v2).
 """
 
 from __future__ import annotations

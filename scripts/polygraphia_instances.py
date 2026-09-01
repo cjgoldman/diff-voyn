@@ -7,8 +7,16 @@ and writes wordtypes instances in the wordhom-control format, so
 `scripts/wordhom_study.py`-style solve/score stages can consume them.
 
 Two shapes per language, fixed by the findability contrast of §6.2:
-- ``cyclic``: length ≫ n_columns → tokens/type well above the ≥8 wall;
+- ``cyclic``: length ≫ n_columns → tokens/type well above the wordhom
+  findability wall (≈ 4 tok/type under the wildcard→anneal solver, ≥ 8
+  under plain SA; docs/project_status.md §3);
 - ``hapax``: length = n_columns → every column used once, tokens/type ≈ 1.
+
+QUARANTINE (2026-08-31, docs/polygraphia_status.md §5, CLAUDE.md): these
+instances are instrumentation only — the 41-column cyclic cells produced the
+pipeline's first false CALLS (periodic pseudo-language objective trap) and
+must never join a control battery, control manifest or threshold
+calibration. Any use is its own explicitly-named study, gated on the user.
 
 Because the same word can stand under different letters in different
 columns, a type-deterministic (wordhom) key cannot represent the cipher

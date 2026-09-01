@@ -6,6 +6,8 @@ selects on noise at Borg scale (argmin over ~1,375 budget-8 paired estimates per
 sweep, winner's curse; accepted 6/6 on Borg and doubled the page SER). Task
 lineage: 5.3 / 6.6 outer tier.
 
+> **Record status (banner extended 2026-09-01):** the winner's-curse framing above and in §1 is the plan's premise; the §7 finding reverses it — **Borg's degradation is mostly the homophonic choice-bits term in the polish objective**, not selection noise; a pure-ELBO polish holds Borg (race 0.1195 → 0.1194, greedy → 0.1198) while the MDL-objective race still degrades it to 0.225. Adopted and enforced in code since 2026-08-25: polishes run on the ELBO alone (`elbo_polish`/`race_polish` raise unless `choice_term_in_polish=True`; `vms/apply.py` `polish_choice_term=False`; `rung2_diffusion.py`, `control6b_pooled_search.py` `--polish-choice-term` opt-in). The race selection rule exists (`ladder.race_polish`, `two_tier.paired_bits_strata`) but is wired only into `scripts/race_polish_pol.py` and `scripts/altloop_pol.py`; the §2.2 `method` switch and the §4 default flip were not done because the §3 study was not run (still not run as of 2026-09-01: five Borg cells, the 18-cell rung-2 sweep, the VMS regression arm, cost tuning). The Phase-6 "fix the outer tier" carry-over is resolved in this form. **Current project position: `docs/project_status.md`** (§5 item 4).
+
 ## 1. The idea in one paragraph
 
 Replace "score every neighbour at a fixed small budget, take the argmin" with a
@@ -73,6 +75,9 @@ Keep `elbo_polish` untouched (it is the recorded Phase-5/6 behaviour). Add a
 `method` switch (`"greedy"|"race"`) where it is called: `vms/apply.py::score_*`
 (`polish_sweeps` neighbour), `scripts/rung2_diffusion.py`,
 `scripts/control6b_pooled_search.py`; default stays `"greedy"` until §4 passes.
+*[Not done as of 2026-09-01: no `method` switch exists in those files; the
+change that did land there is the ELBO-only polish default (§7). `race_polish`
+is called only from `scripts/race_polish_pol.py` and `scripts/altloop_pol.py`.]*
 
 ### 2.3 Unit tests (`tests/test_race_polish.py`)
 CPU only, toy evaluators already in the tree:
@@ -136,7 +141,10 @@ held-out failure case).
 
 - The **alternating loop** (race polish → re-seed the n-gram search → race
   again) is a separate study that depends on this one passing; it gets its own
-  pre-registration.
+  pre-registration. *[Done 2026-08-25: `docs/alt_loop_plan.md` — it went ahead
+  without this study passing, using the denoiser posterior as the re-seeding
+  proposal and the n-gram objective for acceptance (no race polish inside the
+  loop); it became the solver of record's running log (§7–§10).]*
 - Rung-3/4 heads (block maps, arithmetic keys) have different neighbourhoods;
   `race_polish` is written against the symbol→letter map interface only.
 - Borg's < 20-occurrence glyphs and the transcription/edition mismatch stay as
@@ -152,6 +160,10 @@ held-out failure case).
 4. Borg + VMS arms (GPU, ~8 h wall).
 5. Report stage → `analysis/race_polish/report.md`, acceptance table, update
    `docs/phase6_status.md` carry-over list and `CLAUDE.md` state line.
+   *[Status 2026-09-01: steps 1–2 done; steps 3–4 not run; of step 5 only the
+   `docs/phase6_status.md` carry-over (marked resolved 2026-08-25) and the
+   CLAUDE.md racing-polish paragraph were done — no `report.md`, no
+   acceptance table.]*
 
 ## 7. Proof-of-life results (2026-08-25, before the full study)
 

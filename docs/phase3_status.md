@@ -1,5 +1,15 @@
 # Phase 3 — ELBO metrology: status
 
+> **Record status (banner added 2026-09-01):** Phase 3 / ELBO metrology, 2026-08-21 (G3 PASS
+> 23:00 UTC). Still governing: the CRN harness, budget 64 (× 4 replicate seeds), the
+> report-only calibration policy, the same-text finding, per-document error bars and the
+> shuffled-text abstention channel (which became the Phase-6 structure margin). Superseded:
+> every measurement here is on the **Phase-B EMA weights** — the frozen evaluator has been
+> `phase_c-85m-seed0/ckpt_final.pt` since G4 (2026-08-22) — and the adopted table **`v3-ro`**
+> was renamed/re-measured as **`v3-phase_c-ro`** on 2026-08-22 (offsets +0.138 / +0.013 /
+> +0.205, same policy; inline note in §3.4). `docs/project_status.md` §5.12.
+> **Current project position: `docs/project_status.md`.**
+
 Status record for Phase 3 of the [task breakdown](../reference_docs/Diffusion%20Model%20Training%20-%20Task%20Breakdown.md)
 (design §5, §9.1–9.3; requirement R1). Started 2026-08-21 after Gate G2
 (`docs/phase2_status.md`). All measurements are on the **Phase-B EMA
@@ -213,7 +223,13 @@ Three comparisons the table isolates:
 is **`v3-ro`**: the v3 offsets *measured and stored*, **applied offsets
 zero** (`policy: report-only`; `CALIBRATION_VERSION = "v3-ro"` in
 `diff_voyn/metrology/calibration.py`; `calibrate_bits` remains the single
-application point and the G3 static check still enforces it). Reason,
+application point and the G3 static check still enforces it). *[Superseded
+2026-08-22: the code now reads `CALIBRATION_VERSION = "v3-phase_c-ro"`
+(`diff_voyn/metrology/calibration.py:45`) — the same v3 multilingual reference
+re-measured on the Phase-C evaluator (+0.138 / +0.013 / +0.205, spread 0.193;
+`docs/phase4_status.md` §4.4, `docs/phase4_fairness_audit.md`). The report-only
+policy, the single application point and the margin-uncertainty reading are
+unchanged; `docs/project_status.md` §5.12.]* Reason,
 from §3.6: subtracting any of the measured tables drops the 1:1 recovery
 at ≥ 200 chars from 98.4% to 70–72% — the offsets are defined on
 own-language text and are invalid in the one situation where they change
@@ -417,6 +433,11 @@ the Phase-B evaluator weights.
   `true_minus_shuffled_bits_mean`, `wrong_minus_shuffled_bits_mean`) — a
   per-instance shuffled-text control is a far stronger "is this language
   at all" test than any cross-language margin.
+  *[Forward pointer 2026-09-01: this control became the Phase-6 **structure margin**
+  (bits of a letter-shuffled copy minus bits of the decode, own condition) in the
+  frozen judge `vms/apply.py::ABSTAIN_RULE` (plain ≤ 3.0 bits/char AND margin ≥ 1.5,
+  fixed 2026-08-23/24). On the manuscript it spans 0.04–1.25 vs 1.49–2.48 for true
+  decipherments — `docs/phase6_status.md`, `docs/project_status.md` §4.]*
 - **Uncertainty statement** (Phase 6): per-document spread, the
   calibration-precision flag and the replicate flip-rate are the three
   error bars every ranking must carry; the Latin held-out split's

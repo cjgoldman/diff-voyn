@@ -1,5 +1,7 @@
 # Rung 4 — arithmetic sum-to-target head: design note
 
+> **Record status (banner added 2026-09-01):** design note written 2026-08-19 in the cipher-heads early track (CH.8), against the *n-gram* evaluator. Still current: the cipher description (§1), the identifiability chain and lattice DP (§2–§3, the only description of them), the numerical traps and the degenerate-optimum reversal. Superseded: the §5 performance numbers (language 4/6, family 5/6) by the Phase-5 result on the frozen diffusion evaluator — language 7/9, family 8/9 (`docs/phase5_status.md` §5.5, 2026-08-23); and §2(a) as a statement about the manuscript — on the Boxer glyph stream **no admissible canonical glyph order exists** (every LOP optimum forces length-1 tokens), so the head runs as `ArithmeticHead.solve_segmented` on the visible word boundaries (`docs/phase6_status.md` §6.1, 2026-08-23/24). The §6 VMS-scale item was sidestepped by windowed solves. **Current project position: `docs/project_status.md`.**
+
 The design doc (§10) flags the arithmetic cipher head as warranting its own
 design note; the prototyping plan (CH.8) schedules writing it now, against
 n-gram scoring, well before the diffusion backbone is ready. This is that
@@ -44,7 +46,13 @@ structural prior, the *key* is learned:
 The head's leverage comes from a chain of structural deductions, each
 measured before being relied on:
 
-**(a) The canonical order is recoverable from ciphertext alone.** Adjacent
+**(a) The canonical order is recoverable from ciphertext alone.** *[Holds on
+the synthetic ciphers only: on the manuscript's Boxer glyph stream no
+admissible order exists — every exact LOP optimum and every Gumbel-perturbed
+one forces adjacent descents, i.e. length-1 tokens, which the generator
+forbids — so the sorted-token signature the chain rests on is absent and
+Phase 6 ran the head on observed word boundaries instead
+(`docs/phase6_status.md` §6.1, 2026-08-23/24).]* Adjacent
 char pairs within a token always respect the global order; only
 cross-boundary pairs can violate it (~21% of adjacencies at mean token
 length ~4.2). The true order is therefore an optimum of the **linear
@@ -221,3 +229,6 @@ solve (2 restarts + polish) ~10–15 min on a 300-letter instance.
   deliverable; map accuracy is diagnostic.
 - VMS-scale (38k tokens ≈ 160k chars) needs the position loop vectorized or
   chunk-parallelized before Phase 5 runs on real Currier streams.
+  *[Superseded 2026-08-24: Phase 6 solved on 500-token windows (two per
+  dialect) and decoded the full stream with the window key
+  (`docs/phase6_status.md` §6.1); the vectorization was not done.]*

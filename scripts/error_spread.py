@@ -1,4 +1,6 @@
-"""Spatial distribution of letter errors in the latest A-like wordhom finals.
+"""Spatial distribution of letter errors in the A-like wordhom anneal finals
+(2026-08-28, ``analysis/altloop/runs_anneal{,_de}.json``; docs/alt_loop_plan.md
+§8.6 — "latest" as of that date).
 
 Per covered token position, wrong iff its type is mis-mapped (map[sym] !=
 truth[sym]); errors are expanded to letters. Compares window error rates,

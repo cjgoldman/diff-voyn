@@ -1,5 +1,8 @@
 # Throughput of the diffusion-guided n-gram loop on the wordhom head
 
+> **Record status (banner added 2026-09-01):** engineering note, 2026-08-26 (§5 same-day follow-up).
+> Still current: the numba objective/SA/polish and the compiled `levenshtein_ser`; a round is ≈ 24 s and judge-bound (§5 supersedes §3's ≈ 14 s prediction). §4–§5 "what is left" (batched `score_stream` behind a per-row CRN-seed extension; optional `metrics_proposed`) is still OPEN as of 2026-09-01 (`docs/project_status.md` §6). **Current project position: `docs/project_status.md`.**
+
 Status: profiled and optimized 2026-08-26. Code: `diff_voyn/heads/wordhom_state.py`
 (new), `diff_voyn/heads/wordhom.py` (`sa_phase` / `polish` rewired),
 `tests/test_wordhom.py` (exactness tests). Nothing in the scoring,
@@ -80,7 +83,7 @@ first call, ~2 s):
 | SA 200k + polish from a 512-kick (`rand` arm shape) | ~137 s + (k−1)×36 s | 30 s | **2.0 s** (A) / **3.7 s** (B, 9 sweeps) |
 
 Per round on the wordhom head: `none` arm 141 s → ≈ 14 s (2 s SA + 10 s
-metrics + 1.3 s scores); `rand`/`psamp` 400–520 s → ≈ 15 s. The n-gram
+metrics + 1.3 s scores); `rand`/`psamp` 400–520 s → ≈ 15 s *[revised in §5 below: measured ≈ 24 s per round once the `levenshtein_ser` term was found and compiled; the diffusion metric is the remaining cost]*. The n-gram
 inner search went from ≥ 90 % of a round to ~15 %; the GPU metrics are now
 the dominant term. Both versions reach the same local optima on the
 benchmark cells (identical final objectives from the optimum; from the

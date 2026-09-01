@@ -1,10 +1,18 @@
 # Diffusion-guided n-gram search for high-hapax symbol codes
 
+> **Record status (banner added 2026-09-01):** cold-read method note for the posterior re-seeding stage of the loop (2026-08-25), with a §4 correction (2026-09-01) stating the findability wall by solver stage.
+> Still current: §2–§3 mechanism, §4 "works / limits" as measured for re-seeding alone, §5 literature pointers. Superseded: the §1 table and the round budget (plain SA / proof-of-life settings); "judge in the acceptance rule … not done" (tested 2026-08-28, no gain; the hapax-wildcard objective and its anneal, `docs/alt_loop_plan.md` §8.4–8.6, are what moved the wall to ≈ 4 tokens per type). **Current project position: `docs/project_status.md`.**
+
 A method note, written to be read cold. It describes what we built, what it
 does and does not do, and the vocabulary needed to find the neighbouring
 literature. Records: `docs/alt_loop_plan.md` §7–8 (proof of life and the
 hapax-masking variant), `docs/altloop_vms_plan.md` §12 (manuscript run),
-`docs/wordhom_study.md` §3 (the identifiability curve this attacks). Code:
+`docs/wordhom_study.md` §3 (the identifiability curve this attacks); later
+stages (added 2026-09-01): `alt_loop_plan.md` §8.4–8.7 (hapax-wildcard
+objective, judge in the acceptance rule, wildcard → anneal, judge vs SER),
+§9 (small-commitment loop, refuted), §10 (manuscript-shaped control
+battery); `altloop_vms_plan.md` §13 (wildcard → anneal on the manuscript,
+24/24 NOISE); `docs/project_status.md` §3 (the wall by solver stage). Code:
 `diff_voyn/heads/{posterior,altloop}.py`, `scripts/altloop_pol.py`,
 `scripts/altloop_vms.py`.
 
@@ -22,7 +30,7 @@ EM over the key.
 That search is reliable as long as each key entry is *evidenced*: every symbol
 occurs often enough that the objective can distinguish its correct assignment
 from its neighbours. Our measured break point, on synthetic word-homophonic
-ciphers with ground truth (8 000 plaintext letters, key size varied):
+ciphers with ground truth (8 000 plaintext letters, key size varied; **under plain multi-restart SA**, `wordhom_study.md` §3.1 — see the §4 correction for the current solver's wall):
 
 | tokens per type | hapax types | letter SER after 1.5M SA steps |
 |---|---|---|
@@ -72,7 +80,7 @@ One **alternation round**, given a current key:
    50k–200k steps, then greedy polish).
 6. **Accept** the round iff the *n-gram penalized objective* improved.
 
-Repeat ≤ 6 rounds with patience 2. The asymmetry in step 6 is deliberate: the
+Repeat ≤ 6 rounds with patience 2 *[round budget superseded: 32 rounds is a free gain (`alt_loop_plan.md` §9.1, 2026-08-27), and the solver of record runs ≤ 96 rounds / patience 10 (wildcard) then ≤ 80 / patience 10 (anneal), §8.4–8.6; the `--rounds 6 --patience 2` CLI defaults still encode this proof-of-life setting]*. The asymmetry in step 6 is deliberate: the
 diffusion model is a proposal distribution over key edits, never the acceptance
 criterion, so the loop cannot import the judge's own tolerance of wrong symbols
 (we have a recorded case where the judge's preferred key is worse cryptanalytically).
@@ -91,6 +99,8 @@ read (`position_posterior(force_mask=…)`). Effect at 3 % hapax tokens: none. A
 0.3–1.2k nats, hurts German by 0.7–1.3k), no trap escaped. Masking removes bad
 context but also removes context the denoiser needs for the *non*-hapax
 positions; the effects cancel. Not adopted.
+
+*[Hapax handling was adopted in a different form (2026-08-27/28): hapax types as wildcards in the n-gram *objective* — charged a constant and frozen out of the search until the frequent types converge, then annealed back in — which is what broke the A-like traps (`alt_loop_plan.md` §8.4, §8.6).]*
 
 ## 4. What it does and does not do
 
@@ -112,19 +122,43 @@ keys the annealer can improve on. Same kick size, opposite outcome.
   (it re-proposes the rejected set); sampling fixes the stall.
 - *Objective traps are untouched.* Where the true key is *below* the n-gram
   optimum — which is the defining property of the high-hapax regime — no proposer
-  helps, because acceptance is on that objective. Fixing this requires putting the
-  diffusion bound into the acceptance rule, which we have not done.
+  helps, because acceptance is on that objective. Putting the diffusion bound
+  into the acceptance rule was tested 2026-08-28 with no gain (`alt_loop_plan.md`
+  §8.5); what worked instead was changing the n-gram objective — hapax types as
+  wildcards, then annealed back in (§8.4, §8.6) *(corrected 2026-09-01;
+  originally read "Fixing this requires putting the diffusion bound into the
+  acceptance rule, which we have not done")*.
 - *It did not transfer to the target regime.* On 72 Voynich manuscript cells
   (3 heads × 3 languages × dialects/transcriptions) at 3.0–4.6 tokens per type,
   the guided arm is indistinguishable from both controls: 62/72 cells end on the
   identical key, the only accepted rounds *lower* the structure margin, nothing
   crosses any pre-registered threshold. Read as "the method did not find it",
   not as evidence of absence.
+  *[Also true of the solver of record: the wildcard → anneal pipeline on the 12 wordhom manuscript cells returned NOISE 24/24 (2026-08-29, `altloop_vms_plan.md` §13).]*
 
-The honest summary: **diffusion-guided re-seeding buys roughly one octave of key
+The honest summary for re-seeding *alone*: **it buys roughly one octave of key
 sparsity** — it converts 6–8 tokens-per-type instances from unsolvable to solved,
-and does nothing at 3–5, where the objective rather than the search is the
-binding constraint.
+and on its own does nothing at 3–5, where the objective rather than the search
+is the binding constraint.
+
+*Correction (2026-09-01).* The sentence above was written before the
+hapax-wildcard objective and its anneal (`docs/alt_loop_plan.md` §8.4–8.6,
+§10.1), which moved the wall again. The findability wall as measured, by
+solver stage, on synthetic word-homophonic ciphers with ground truth:
+
+| solver | tokens per type where the key is recovered |
+|---|---|
+| plain multi-restart SA (`WordHomophonicHead.solve`) | ≥ 8 (SER 0.01–0.03); fails at ≤ 5.7 (`wordhom_study.md` §3.1) |
+| + posterior re-seeding (this note) | 6.6 → SER 0.026 / 0.047 |
+| + hapax-wildcard objective → anneal (current solver, `altloop_vms.py --wild --wild-anneal`) | B-like 5.5–5.6 → SER 0.026 / 0.036 / 0.070; **A-like and `nodouble` 4.1–4.4 → 0.03–0.12**; A-like German (margin 2.13) and Latin (1.70–1.72, 3 seeds) called by the frozen judge, Italian not (1.39; its truth scores 1.56) — `analysis/altloop/judge_at_ser.md`, tabulated in `alt_loop_plan.md` §10.1 (A-like table) and in the `d5` reference column of `wordhom_bigram_variant.md`; `nodouble` de/la called in §10.1 |
+| any stage | ~3.5 → SER 0.73–0.77 with the found key *below* the truth in objective; Naibbe real-vs-shuffled twins at 3.4 indistinguishable |
+
+So the current wall is **≈ 4 tokens per type**, not 6–8: Currier B (4.6) is
+inside the regime where clean manuscript-shaped positives solve and still
+returned NOISE on 24/24 runs, while Currier A (3.0) sits below it, where the
+true key is no longer the n-gram optimum. Anything that shortens the text
+(windowing, per-page solves) lowers tokens per type and moves *away* from the
+wall — a 1024-token window of the manuscript has 1.75–2.0 tokens per type.
 
 ## 5. Where to look in the literature
 

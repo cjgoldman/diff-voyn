@@ -1,5 +1,14 @@
 # Phase 1 — Backbone pretraining: status
 
+> **Record status (banner added 2026-09-01):** Phase 1 / Phase-A pretraining, written
+> 2026-08-18, extended to the G1 verdict of 2026-08-21 (G1 PASS). The training record, the
+> tiled held-out anchors (2.3496 / 2.5538 / 1.8997) and the EMA lesson are still the record of
+> that phase. Superseded: the Phase-A checkpoints named as "frozen evaluator candidates" (the
+> evaluator has been `phase_c-85m-seed0/ckpt_final.pt` since G4, 2026-08-22, frozen for Phase 5)
+> and calibration table **v1** (superseded by `v3-ro` 2026-08-21, then `v3-phase_c-ro`
+> 2026-08-22, policy report-only) — `docs/project_status.md` §5.12. **Current project position:
+> `docs/project_status.md`.**
+
 Status record for Phase 1 of the [task breakdown](../reference_docs/Diffusion%20Model%20Training%20-%20Task%20Breakdown.md).
 Written 2026-08-18. Companion to `docs/phase0_decisions.md`.
 
@@ -97,7 +106,7 @@ tasks 1.4/1.5) is judged from the ClearML `heldout_nelbo_bits_per_char`
 curves; if a language stalls while others improve, adjust the sampling
 temperature τ, not the schedule (non-negotiable #3).
 
-## Remaining before Gate G1
+## Remaining before Gate G1 (all three completed — see the G1 verdict below)
 
 - 1.4 plateau + 1.5 interference watch: monitor the two ClearML tasks.
 - 1.6 (P2): 25M/85M ranking-agreement probe on a clean-text sample once both
@@ -106,7 +115,11 @@ temperature τ, not the schedule (non-negotiable #3).
   small per-language char-AR reference models should be built while Phase A
   trains (metrology must not slip behind training).
 
-## Gate G1 — verification (2026-08-20, in progress; see "G1 verdict" below when final)
+## Gate G1 — verification (2026-08-20 dry run; verdict below)
+
+*(Heading corrected 2026-09-01; originally read "Gate G1 — verification (2026-08-20, in
+progress; see "G1 verdict" below when final)" — the verdict was PASSED on 2026-08-21, §"G1
+verdict".)*
 
 Both runs completed 20k steps cleanly (2026-08-19 for 25M, 2026-08-20 for
 85M). `scripts/g1_check.py` (dry run, step-20000 checkpoints) gave:
@@ -237,6 +250,11 @@ Offset spread 0.23 bits/char (AR v2) vs 0.11 (AR v1). Read honestly:
   actual test of the calibrated ranking. A matched-capacity reference
   (≥25M-class AR, backbone-scale char budget) is the upgrade path if 3.5 finds
   the slack matters.
+  *[Superseded 2026-08-21: Phase 3 built AR reference **v3** — one multilingual 19.3M
+  model on the backbone's own mix — and the 3.5 audit escalated reference-dependence
+  anyway; the response was the **report-only** policy (offsets measured, never
+  subtracted, carried as margin uncertainty), not a bigger reference. See
+  `docs/phase3_status.md` §3.4; `docs/project_status.md` §5.12.]*
 - The offsets apply to the **own-language score of a candidate plaintext**
   (Phase 5: each language hypothesis decodes its own plaintext, scored under
   its own condition, then `NELBO − offset_L` compared). They are *not* a
@@ -263,3 +281,7 @@ gap is visible on the dashboard.
 **→ Phase 2 (noise curriculum) may start: tasks 2.1–2.3 generators first.**
 Frozen evaluator candidates: `DATA_ROOT/runs/phase_a-85m-seed0/ckpt_final.pt`
 (EMA, step 23000) and the 25M sibling.
+*[Superseded 2026-08-22: the frozen evaluator is the joint Phase-C checkpoint
+`DATA_ROOT/runs/phase_c-85m-seed0/ckpt_final.pt` (G4, `docs/phase4_status.md`; sha256 in
+`analysis/phase5/evaluator_freeze.json`), with `phase_c-25m-seed0` as the search sibling —
+`docs/project_status.md` §5.12.]*

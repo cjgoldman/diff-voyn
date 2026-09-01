@@ -1,0 +1,191 @@
+# diff-voyn — project status and development ladder
+
+**Status date: 2026-09-01.** This is the one document that states the project's *current* position. Every other file in `docs/` (and every memory file) is a dated record of the period it was written in; each now carries a top banner naming that period and pointing here. **Reading rule: the first mention of a number or technique in any document is not its current value — check the banner date, then this file.** When two records disagree, the later-dated one wins and §5 below arbitrates.
+
+Companion narrative for non-specialists: `docs/project_goals_and_progress.md` (frozen at the Phase-6 result, 2026-08-24). Working instructions for agents: `CLAUDE.md`.
+
+---
+
+## 1. Current status (2026-09-01)
+
+**Verdict — the manuscript abstains under every cipher hypothesis, head and solver tried.** Four independent manuscript campaigns, each pre-registered, each NOISE on every cell:
+
+| date | campaign | cells | result | record |
+|---|---|---|---|---|
+| 2026-08-24 | Phase 6: four heads × 3 languages × Currier A/B × 3 transcriptions | 87 | 0/87 language-like; structure margin 0.04–1.25 vs true decipherments 1.49–2.48 | `phase6_status.md`, `phase6_writeup.md` |
+| 2026-08-26 | alternating n-gram ↔ diffusion loop (posterior re-seeding), wordhom/homophonic/sub1to1 | 72 | 72/72 NOISE; psamp margins 0.36–1.05 | `altloop_vms_plan.md` §12 |
+| 2026-08-29 | wildcard → anneal solver on the 12 word-homophonic cells, 2 seeds | 24 | 24/24 NOISE; anneal finals return to the Phase-6 start values (A 0.40–0.54, B 0.30–0.43) | `altloop_vms_plan.md` §13 |
+| 2026-08-31 | `d5b20` bigram-unit decoder variant (de, la) | 8 | 8/8 NOISE | `wordhom_bigram_variant.md` |
+
+The language ranking among those non-decipherments is noise (within-head margins 0.001–0.083 bits/symbol vs calibration uncertainty 0.067–0.193; heads, dialects and transcriptions disagree). One structural result stands: a Naibbe-shaped unigram/bigram token grammar describes **Currier A** below the stream's own held-out bigram cross-entropy (2.09 vs 2.18 and 2.12 vs 2.23 bits/symbol, both transcriptions) but not Currier B — a description-length statement about word structure, not a decipherment.
+
+**What the abstention now means, by dialect (new since Phase 6).** The word-homophonic findability wall is ≈ 4 tokens per type for the current solver (§3). Currier **B** (4.6 tokens/type) sits *inside* the regime where clean manuscript-shaped positives are solved and called, and still returned NOISE 24/24 — so B's abstention is not a search-budget failure. Currier **A** (3.0) sits *below* anything ever recovered; there the n-gram objective's optimum is not the truth, so A's abstention is correct but uninformative about the hypothesis. Anything that shortens the text (windowing, per-page solves) lowers tokens per type and moves away from the wall (a 1024-token manuscript window is 1.75–2.0 tokens/type); a windowed-vote parallelization was evaluated and rejected 2026-09-01.
+
+**Instrument (unchanged since Phase 5).** Frozen evaluator `DATA_ROOT/runs/phase_c-85m-seed0/ckpt_final.pt` (sha256 in `analysis/phase5/evaluator_freeze.json`); calibration table `v3-phase_c-ro`, policy report-only (offsets measured, never subtracted; they are the ranking's systematic uncertainty); scoring budget 64 stratified CRN draws × 4 replicate seeds; every (cipher × language) cell ranked on the **MDL total per ciphertext symbol**, never the pure ELBO; the homophonic choice-bits term is kept for ranking and **never** inside a polish or loop (code raises otherwise).
+
+**Heads.** The four Phase-5 heads (1:1 substitution, unigram homophonic, Naibbe mixed unigram/bigram, arithmetic sum-to-target) plus a fifth added after Phase 6: the **word-homophonic head** (`heads/wordhom.py`, Boxer's hypothesis without the arithmetic — word tokens as homophones for letters plus the language's top-5 *doubled letters*, unit spec `d5`; the `d5b20` bigram-unit variant was tested 2026-08-30/31 and is not the default). On the manuscript the arithmetic head cannot run its validated way (no admissible canonical glyph order on the Boxer stream) and runs as `ArithmeticHead.solve_segmented` on observed word boundaries.
+
+**Solver of record (word-homophonic cells).** Hapax-wildcard n-gram objective → anneal re-admission of the wildcards → post-all diffusion-guided loop, patience ≥ 10: `scripts/altloop_vms.py --wild`, then `--wild-anneal 0,40 --patience 10 --rounds 80 --start-from <wild tag>` (`docs/alt_loop_plan.md` §8.4–8.6, §10). Plain multi-restart SA (`WordHomophonicHead.solve`) is the baseline/control arm only. Note that the CLI defaults of `altloop_vms.py`/`altloop_pol.py` (`--rounds 6 --patience 2`, `--wild` off) still encode the 2026-08-25 proof-of-life loop, not the solver of record.
+
+**Judge of record.** The frozen `vms/apply.py::ABSTAIN_RULE` — plaintext ≤ 3.0 bits/char AND structure margin (letter-shuffled copy minus decode, own condition) ≥ 1.5 — fixed 2026-08-23/24 before any manuscript number was read. Known properties (§4): it calls only near-perfect decodes (anneal finals: German SER 0.05 called at margin 2.13, Latin 0.07 called at 1.70, Italian 0.12 not called at 1.39 — Italian A-like truth itself scores 1.56); putting it inside the loop's acceptance rule was tested 2026-08-28 with no gain; strict gibberish (letter-shuffled-source voynichesque twins) peaks at 1.40, so the threshold's safe corridor against a strict negative is ≈ 1.41–1.48, not the 1.26–1.48 quoted in Phase 6; the one pipeline that produced *false* calls (Polygraphia cyclic cells, 1.76–1.96 at SER 0.74–0.77) is quarantined. Candidate second criteria (rare-aware margin, exact ≥ 7-letter lexical density, learned LID/posterior LR) call SER 0.12–0.20 on synthetics but are **not pre-registered, not implemented as reportable statistics, not adopted**.
+
+**Phase-6 acceptance.** The frozen roll-up stands as recorded: FAIL on one P0 sub-criterion (voynichesque abstention 8/9 = 0.89 vs > 0.95, one instance at margin 1.51). The 2026-08-31 strict-negative twins show that instance is content-inflated (real-text voynichesque is a wrong-hypothesis control, not a strict negative; the twin scores 1.14–1.24) and that strict negatives abstain 9/9 — the failing bar was tested on a non-negative. The verdict is not re-tuned; this is recorded as a re-classification, not a pass.
+
+**Uncommitted at status date.** `docs/diffusion_guided_search_method.md` §4 correction (2026-09-01), this file and the banner/correction edits of 2026-09-01.
+
+---
+
+## 2. Development ladder (dated)
+
+| date | milestone | key numbers | record |
+|---|---|---|---|
+| 2026-08-18 | Phase 0 frozen: vocab v1 (32 symbols), corpus v1 (la/it/de), splits v1, normalizer v1, pinned ciphers, VMS ingest | — | `phase0_decisions.md` |
+| 2026-08-18/19 | Cipher-heads early track (CH.0–CH.9) on the *n-gram* evaluator | rung 2: 4/6 cells ≤ 2 % SER; rung 3: 85–95 % map acc; rung 4: language 4/6, family 5/6 | `cipher_heads_status.md`, `rung4_arithmetic_design.md` (historical) |
+| 2026-08-21 | **G1** (Phase A pretraining, 85M + 25M) | tiled held-out NELBO 2.35 / 2.55 / 1.90 bits/char (la/it/de) | `phase1_status.md` |
+| 2026-08-21 | **G2** (Phase B noise curriculum) | 5 %-wrong-key cost halved; NULL frame ≈ 0.5 bits/char overhead | `phase2_status.md` |
+| 2026-08-21 | **G3** (metrology: CRN, budget 64, calibration `v3-ro` report-only) | recovery 98.4 % language / 98.7 % family at ≥ 200 chars; applying offsets drops it to ~70 % | `phase3_status.md` |
+| 2026-08-22 | **G4** (Phase C joint LID head; frozen evaluator `phase_c-85m-seed0`; calibration `v3-phase_c-ro`) | 98.9 % / 99.1 %; λ ≈ 0.003; task 4.7 seed replication **paused** | `phase4_status.md` |
+| 2026-08-22 | n-gram judge robustness side study | n-gram judges never saturate under wrong keys and drift to "German"; the diffusion judge's robustness is the curriculum | `ngram_judge_robustness.md` |
+| 2026-08-23 | **G5** (cipher heads on the frozen evaluator) | rung 1 SER 0.0016; rung 2 17/18 ≤ 1.9 % SER, language 18/18 by MDL; rung 3 map acc 0.998; rung 4 language 7/9; cross-head MDL 24/24; gradient refinement never moves a key; pure ELBO prefers degenerate decodes → MDL total | `phase5_status.md` |
+| 2026-08-24 | **Phase 6** — the manuscript abstains | 0/87; margins 0.04–1.25; acceptance FAIL on voynichesque 0.89 | `phase6_status.md`, `phase6_writeup.md`, `project_goals_and_progress.md` |
+| 2026-08-24 | Confidence-mask judging probe — **not adopted** | E1 fail; oracle ceiling +0.06 vs required +0.15 | `confidence_mask_probe.md` §9 |
+| 2026-08-24 | Control experiments 6a/6b launched then **paused** (18:05) | 6b rung 1: recovery A 0.994 vs pooled B 0.978 / C 0.972 — the asymmetry is Latin, not the hypothesis; rest unfinished, no write-up | memory `control-6ab-experiments`; `analysis/control6/` |
+| 2026-08-24/25 | Word-homophonic study (fifth head; plain SA) | unit = top-5 doubled letters (bigrams fail the doubling control); **plain SA** recovers keys only at ≥ 8 tokens/type; all 12 VMS cells abstain (margin 0.19–0.50) | `wordhom_study.md` |
+| 2026-08-25 | Racing polish proof of life | Borg's polish degradation is the **choice term in the objective**, not winner's curse; ELBO-only polish holds Borg (0.1195 → 0.1194); enforced in code; full study not run | `race_polish_plan.md` §7 |
+| 2026-08-25 | Alternating loop proof of life (posterior re-seeding) | rung-2 cold-SA escapes 10/24 vs random 6/24 vs SA alone 0/24; wordhom 6.6 tokens/type 0.42 → 0.026/0.047 | `alt_loop_plan.md` §7, `diffusion_guided_search_method.md` |
+| 2026-08-25/26 | Alternating loop on the manuscript | 72/72 NOISE | `altloop_vms_plan.md` §12 |
+| 2026-08-26 | Throughput: numba objective, numba SER | SA 137 s → ~2 s; round ≈ 24 s, judge-bound | `wordhom_throughput.md` |
+| 2026-08-26/27 | Hapax masking (`-hm`, `-nh`, `hm0`) **not adopted**; small-commitment loop **refuted**; 32 rounds a free gain | A-like finals still SER 0.55–0.76 | `alt_loop_plan.md` §8–8.3, §9 |
+| 2026-08-27 | **Hapax-wildcard objective** breaks the A-like traps | 96 rounds / patience 10: German 0.13, Latin 0.17, Italian 0.21–0.24 (all 9 runs converge) | `alt_loop_plan.md` §8.4 |
+| 2026-08-28 | Judge in the acceptance rule — **no gain** | Italian 0.206 → 0.204, Latin 0.173 → 0.172 | `alt_loop_plan.md` §8.5 |
+| 2026-08-28 | **Wildcard → anneal** re-admission — adopted as solver of record | A-like finals German 0.048–0.050, Latin 0.066–0.073, Italian 0.119–0.122 | `alt_loop_plan.md` §8.6 |
+| 2026-08-28 | Judge vs SER; error spread; lexical coverage | margin crosses 1.5 at SER ≈ 0.10 (de) / 0.045 (la) / < 0.03 (it) on corruption curves; anneal finals de/la **called**, it not; errors iid-uniform along the stream, > 95 % from rare types | `alt_loop_plan.md` §8.7, `lexical_coverage_note.md` |
+| 2026-08-28/29 | Wildcard → anneal on the manuscript | 24/24 NOISE | `altloop_vms_plan.md` §13 |
+| 2026-08-29/30 | Manuscript-shaped control battery for the solver of record | 12 negatives + 6 cross-language all NOISE ≤ 0.48; B-like positives German 0.026 (2.22, called), Latin 0.036 (1.83, called), Italian 0.070 (1.46, not called; truth ceiling 1.61); `nodouble` costs nothing; `revdouble` German still called; dirty-10 % truth ceilings 1.54 / 1.06 / 0.91; Latin held-out doc 0 is a 4.66-bpc pharmacopoeia (sampler resamples > 3.6 bpc) | `alt_loop_plan.md` §10 |
+| 2026-08-29 | Judge-alternatives team study; lexical-density and learned-judge probes | rare-aware margin, lexical density ≥ 7, learned LR survive (callable SER 0.12–0.20); noisy-channel, slope, shape, fuzzy refuted; **nothing pre-registered or adopted** | `judge_alternatives.md` |
+| 2026-08-30/31 | `d5b20` bigram-unit decoder variant | letters-only ciphers unharmed 3/3; Italian d5 cipher hurt (0.314); matched 48-unit cipher unfindable 3/3 at ~4 tokens/type; VMS 8/8 NOISE | `wordhom_bigram_variant.md` |
+| 2026-08-31 | Voynichesque × wordhom collision; strict-negative (no-content) twins through the Phase-6 controls pipeline | homophonic band content-inflated Δ −0.27 (27/27 pairs); sub1to1 −0.02, naibbe +0.02 (pure glyph grammar); strict-gibberish ceiling 1.40; 9/9 abstain; P0 near-miss 1.51 → 1.24 | `voynichesque_nocontent_restart.md` (results section), `analysis/phase6/controls_nocontent/` |
+| 2026-08-31 | Naibbe real-vs-shuffled twins at 3.4 tokens/type | real ≈ nonsense at every stage (Δ ≤ 0.03 ± 0.07) — zero content below the wall | memory `naibbe-wordhom-twins`, `scripts/naibbe_wordhom_twins.py` |
+| 2026-08-31 | Polygraphia (Trithemius) digitization; provisional 41-column anchor | **first false CALLS** (cyclic cells 1.76–1.96 at SER 0.74–0.77, periodic pseudo-language objective trap); cipher not representable in the wordhom key space → **QUARANTINED** from every control workflow (user decision) | `polygraphia_status.md` §5, `CLAUDE.md` |
+| 2026-09-01 | Findability wall restated by solver stage; windowed-vote parallelization rejected | wall ≈ 4 tokens/type; B inside, A below | this file §3, `diffusion_guided_search_method.md` §4 |
+
+---
+
+## 3. The word-homophonic findability wall, by solver stage
+
+The most-misquoted number in the project. "Findability wall" = the tokens-per-type ratio above which the key of a synthetic word-homophonic cipher (ground truth known, 8k–30k letters, 30-unit key) is recovered.
+
+| solver stage | date | recovered at | fails at | record |
+|---|---|---|---|---|
+| plain multi-restart SA (`WordHomophonicHead.solve`) | 08-24/25 | ≥ 8 tokens/type (SER 0.004–0.03 at 8.2–8.4); German positive at 8.3 called (SER 0.008, margin 2.27) | 6.7–6.8 → SER 0.30–0.54; ≤ 5.7 → 0.57–0.76 | `wordhom_study.md` §3.1, §3.2 |
+| + posterior re-seeding (`heads/altloop.py::alternate`) | 08-25 | 6.6 → SER 0.026 / 0.047 | A-like not attempted | `alt_loop_plan.md` §7.4 |
+| + hapax-wildcard objective, 96 rounds | 08-27 | A-like 4.1–4.4 → 0.13 / 0.17 / 0.21–0.24 | — | `alt_loop_plan.md` §8.4 |
+| + **wildcard → anneal (solver of record)** | 08-28/30 | A-like 4.1–4.4 → German 0.05, Latin 0.07 (both **called**), Italian 0.12 (not called); B-like 5.5–5.6 → 0.026 / 0.036 / 0.070; `nodouble` 4.3–4.4 → 0.027 / 0.040 / 0.094 | ~3.5 → SER 0.73–0.77 with the found key *below* the truth on the objective; Naibbe twins at 3.4 indistinguishable from shuffled; a 48-unit key at ~4 → 0.70–0.72 | `alt_loop_plan.md` §8.6, §10.1; `wordhom_bigram_variant.md`; `analysis/altloop/judge_at_ser.md` |
+
+**Net: ≈ 4 tokens per type for a 30-unit key.** Below ~4 the lever is the objective / a compact key rule (what Boxer's arithmetic was), not more search or partitioned text.
+
+**Labelling trap.** The synthetic "A-like" and "B-like" cells match the manuscript's *letter and type counts* (14 000 letters / 5 200 types; 30 000 / 7 200), which gives **4.1–4.4 and 5.5–5.7 tokens per type with ~45 % hapax types** — not the manuscript's 3.0 / 4.6 with 69–75 % hapax types. Sentences that call the synthetic cells "the manuscript's regime" or say a key was recovered "at 3 tokens per type" are wrong (corrected in place in `altloop_vms_plan.md` §13 and `wordhom_study.md` §3.2). The battery negatives are likewise at 4.2–6.4 tokens/type.
+
+---
+
+## 4. Judge and controls — what is adopted and what is not
+
+| criterion / control | date | status | record |
+|---|---|---|---|
+| `ABSTAIN_RULE`: plain ≤ 3.0 AND structure margin ≥ 1.5 | 08-23/24 | **the judge of record**, frozen; constants duplicated in `heads/altloop.py` | `vms/apply.py` |
+| Confidence-masked judging | 08-24 | not adopted (E1 fail, ceiling +0.06) | `confidence_mask_probe.md` §9 |
+| Judge inside the loop's acceptance rule | 08-28 | tested, **no gain** (residual is basin noise, not a referee problem) | `alt_loop_plan.md` §8.5 |
+| Judge-vs-SER calibration | 08-28 | margin = 1.5 at SER ≈ 0.10 de / 0.045 la / < 0.03 it (uniform corruption); search-shaped Latin residuals at 0.066–0.073 are nevertheless called (1.70–1.72) | `alt_loop_plan.md` §8.7; `analysis/altloop/judge_at_ser.md` |
+| Lexical coverage (K 5000, L ≥ 5) | 08-28 | superseded as a candidate by lexical density (L ≥ 7); Latin did not separate | `lexical_coverage_note.md` |
+| Rare-aware margin; lexical density ≥ 7; learned LR | 08-29 | survive on synthetics (callable SER 0.12–0.20); **not pre-registered, not implemented, not adopted**; noisy-channel / slope / shape / fuzzy / argmax denoising rejected | `judge_alternatives.md` |
+| Phase-6 negative battery (39 instances) | 08-24 | positives 1.49–2.48; voynichesque (real-text source) 0.92–1.51 → **a wrong-hypothesis control, not a strict negative**; shuffled 0.03–0.06; contamination 0.60–1.43 | `phase6_status.md` §6.3 |
+| Strict-negative voynichesque twins (letter-shuffled source) | 08-31 | ceiling **1.40**, 9/9 abstain; safe corridor for the threshold ≈ 1.41–1.48 | `voynichesque_nocontent_restart.md`; `analysis/phase6/controls_nocontent/` |
+| Manuscript-shaped wordhom battery | 08-29/30 | negatives ≤ 0.48; clean de/la positives called; Italian A-like uncallable even at truth (1.56–1.61) | `alt_loop_plan.md` §10 |
+| Polygraphia cyclic cells | 08-31 | **false calls** 1.76–1.96 at SER 0.74–0.77 → quarantined from all control sets | `polygraphia_status.md` §5 |
+| Anchors | 08-24 | Zodiac-408 SER 0.0098 PASS (n-gram tier); Borg ranked Latin (0.250 bits/symbol) but SER 0.129/0.226 vs ≤ 0.041, not like-for-like; BnF fr2988 unavailable | `phase6_status.md` §6.6 |
+
+---
+
+## 5. Corrections to earlier records (the canonical readings)
+
+Each of these appears in at least one earlier document in its superseded form. The earlier text is kept (history) and annotated in place; this list is the arbiter.
+
+1. **Word-homophonic findability.** "Only findable at ≥ 8 tokens per type" is the **plain-SA** result (2026-08-25). The solver of record clears ≈ 4 (§3). Currier B is inside the solvable regime; Currier A is below it.
+2. **"Judge in the acceptance rule is the open path / the only stronger path / not done."** Tested 2026-08-28: no gain. The traps were broken instead by the hapax-wildcard objective (08-27) and the anneal (08-28). Option B's other half, the manuscript-shaped battery, was run 2026-08-29/30.
+3. **"No VMS cell was run" (alt-loop).** 72 cells 2026-08-26, 24 runs 2026-08-29, 8 runs 2026-08-31 — all NOISE.
+4. **Borg `elbo_polish` degradation.** Mostly the homophonic **choice-bits term in the polish objective** (2026-08-25, `race_polish_plan.md` §7), not winner's curse; a pure-ELBO greedy or race polish holds Borg. Code defaults enforce ELBO-only polishing. The Phase-6 carry-over "fix the outer tier" is resolved in this form; the full race study (§3 of the plan) was not run. The 2026-08-24 "selection bias" account in `phase6_status.md` §6.6 (first paragraph), `phase6_writeup.md` and `project_goals_and_progress.md` is superseded.
+5. **Uncovered ciphertext symbols** are charged at the stream's own best held-out n-gram cross-entropy (order-0 entropy only as a fallback) — `vms/apply.py:810–818`. `phase6_writeup.md`'s "order-0 entropy" is wrong.
+6. **Voynichesque** (`ciphers/controls.py`) is generated from real held-out text and its homophonic band is content-inflated by ~0.27 bits/char; it is a wrong-hypothesis control. The strict negative is the letter-shuffled-source twin (`voynichesque_nocontent`, ceiling 1.40). Docstrings saying "no recoverable plaintext" are corrected. The Phase-6 P0 FAIL was a mis-specified test on a non-negative (verdict left as recorded).
+7. **Phase-6 "any threshold in 1.26–1.48 abstains on the whole manuscript and on no positive control"** — still true against the Phase-6 battery, but strict gibberish reaches 1.40, so the corridor that is also safe against a strict negative is ≈ 1.41–1.48.
+8. **Latin A-like anneal finals were called** (SER 0.066–0.073 → margin 1.70–1.72, 3 seeds; `analysis/altloop/judge_at_ser.md`), although the corruption-curve forecast in `alt_loop_plan.md` §8.7 said Latin needs SER ≲ 0.045. Search-shaped residuals are n-gram-plausible and cost the judge less than uniform corruption. `altloop_vms_plan.md` §13's "0.05 (German, called), 0.07 (Latin), 0.12 (Italian)" under-reports.
+9. **"Recovers a key at 3 tokens per type with 74 % hapaxes"** (`altloop_vms_plan.md` §13, original text) is false; the recovered cells are 4.1–4.4 tokens/type, ~45 % hapax types. Nothing at ≤ 3.5 has ever been recovered.
+10. **German rung-2 t0 bank trap (0.240)** is a *search* trap (the `rand-k2` arm opens it, `alt_loop_plan.md` §9.1), not the objective trap §7.3 called it; Latin t5 remains the objective trap.
+11. **Word-homophonic units** are the language's top-5 **doubled letters** (`d5`), not top-5 bigrams (that definition fails the doubling-rate control). `scripts/wordhom_study.py`'s docstring was wrong.
+12. **Evaluator and calibration table.** Current: `phase_c-85m-seed0/ckpt_final.pt`, `v3-phase_c-ro`. Phase-A checkpoints (`phase1_status.md`), Phase-B EMA weights (`phase2_status.md`, `phase3_status.md`), calibration `v1` and `v3-ro` are historical.
+13. **Cipher-heads early-track numbers** (rung 2 4/6, rung 3 85–95 %, rung 4 4/6) are the n-gram-evaluator prototypes of 2026-08-18/19; Phase-5 numbers supersede them.
+14. **Anchors "not yet fetched"** (`cipher_heads_status.md`, `interim_status_2026-08-19.md`): Zodiac-408 and Borg were fetched and run in Phase 6; only BnF fr2988 remains unavailable.
+15. **The abstract's headline** ("Germanic candidates receive the highest likelihood") was tested and is not supported; see `project_goals_and_progress.md` §6–7. `reference_docs/` is left byte-identical as the pre-registration record.
+16. **`confidence_mask_probe.md` "Nothing here has been run"** — it was run the same day (§9), not adopted.
+17. **Commit `bce1dca` "600 unit wordhom" (2026-09-01)** bundles the 2026-08-31 work (Polygraphia, no-content battery, Naibbe twins, `d<k>b<m>` unit-spec parser, `judge_alternatives.md`); the message has no referent — nothing in the project is a "600-unit" anything.
+
+---
+
+## 6. Open items register (as of 2026-09-01)
+
+**Manuscript / method**
+- Currier A (3.0 tokens/type) is below the findability wall; the only proposed lever is a compact key rule (structured-key head) — no design exists; the one historical compact-rule cipher tried (Polygraphia) is not representable in the wordhom key space and is quarantined.
+- EVA tokenization sensitivity sweep (glyph units, benched gallows) — never started (Phase-6 carry-over).
+- Anneal budget: the 80-round cap cost at least two solves on perturbed positives; patience-terminated runs not done. `revdouble/{latin,italian}` built, not run. Second seeds on borderline positives (dirty-5 % German seed-0 call did not replicate at seed 1). `d5b20` Italian d5-cipher second seed.
+- Naibbe-twin positive control at ≥ 8 tokens/type (to show the twin method sees content when there is any).
+- Throughput: batched `score_stream` behind a per-row CRN-seed extension (round is judge-bound at ≈ 24 s).
+- Race polish full study (§3 of the plan), `method` switch, default flip.
+- Rung-3 within-block ELBO swap polish and rung-4 `elbo_polish`-over-`u` — untested since 2026-08-23; rung-3/4 DP vectorization sidestepped by windowing.
+- Task 4.7 (25M seed replication, P2) — paused at resumable checkpoints since 2026-08-22 (`phase4_status.md` §4.7).
+- Control experiments 6a (no-wrong-key curriculum ablation, 25M at step 3600/6000, 85M killed) and 6b rung 2 (solved, unscored) — paused since 2026-08-24 18:05; `docs/control6_experiments.md` never written; only 6b rung 1 has a report (`analysis/control6/control6b_rung1_report.md`).
+
+**Judge**
+- Pre-register, implement and threshold a second criterion (rare-aware margin / lexical density ≥ 7 / learned LR), score it on the full control battery (Phase-6 controls + wordhom battery + strict twins), write `docs/judge2_rule.md`, then re-score the VMS — none started. Italian is uncallable at the manuscript's shape even at truth (ceiling 1.56–1.61).
+- Confidence-probe "what survives" nulls (order-k surrogate shuffles; conditional − unconditional gap) — not pursued.
+
+**Anchors / data**
+- DECODE-aligned Borg transcription; BnF fr2988 transcription (login required).
+- Latin held-out doc 0 (4.66-bpc pharmacopoeia): exclude or down-weight at the next split version (never mutate v1). Corpus v2 for Italian volume — conditional, not triggered.
+- Polygraphia: OCR-first double-keying of ~600 columns, table-aware positional head — all gated on the user's explicit say-so; quarantined meanwhile.
+- SmallARLMEvaluator (CH.7); text8 bits/char anchor; n-gram LM retrained on the noise mixture as the attribution control; length-dependent LID temperature — all long-standing and untouched.
+
+**Documentation**
+- Enforcement (added 2026-09-01): `scripts/doc_coherence_check.py` — banners, known-superseded phrases without qualifier, dangling `docs/…` refs, duplicate section numbers, memory index, and "records changed but this file not touched" — runs as a Claude Code Stop hook (blocks the turn until fixed) and SessionStart hook (`.claude/settings.json`), and as `.githooks/pre-commit` (`git commit --no-verify` to bypass). The semantic half — deciding that a new result supersedes an old claim — is the `/coherence-review` skill (`.claude/skills/coherence-review/SKILL.md`), to be run after any study that changes a result. When a claim is superseded, add a `PHRASE_RULES` entry so the checker catches recurrences.
+- Design-doc revisions (design §8 discrete polish; §8 R5 MDL = key + choice bits; §7.4) were never recorded in `reference_docs/`; the abstract was never revised (A7, A9). Both intentionally left as the pre-registration record — this file and `project_goals_and_progress.md` §6–7 carry the correction.
+- Commit the 2026-09-01 documentation pass (includes the removal of `hybrid_search_method_note.md`, the truncated 2026-08-26 draft superseded by `diffusion_guided_search_method.md`).
+
+---
+
+## 7. Document map
+
+| document | period recorded | role today | superseded parts (annotated in place) |
+|---|---|---|---|
+| `project_status.md` (this file) | 2026-09-01 | **current status; arbiter** | — |
+| `project_goals_and_progress.md` | → 2026-08-24 | non-specialist narrative of Phases 0–6 | §8/§9 next steps (outer tier resolved; battery enlarged; 6a/6b paused); "four heads"; "gibberish band" |
+| `phase0_decisions.md` | 2026-08-18 | **still authoritative** for everything frozen in Phase 0 | voynichesque "negative control" label |
+| `phase1_status.md`, `phase2_status.md`, `phase3_status.md`, `phase4_status.md` | 08-18 → 08-22 | gate records G1–G4 | which weights are "the evaluator"; calibration table names |
+| `phase3_fairness_audit.md`, `phase4_fairness_audit.md`, `phase6_fairness_audit.md` | 08-21 / 08-22 / 08-23 | generated audit snapshots; the Phase-6 one is current | earlier two are snapshots |
+| `g1_pickup_notes.md`, `phase3_pickup_notes.md` | 08-20/21 | interruption records (already banner-ed) | — |
+| `interim_status_2026-08-19.md` | 2026-08-19 | snapshot from mid-Phase 1 | everything forward-looking |
+| `cipher_heads_status.md`, `rung4_arithmetic_design.md` | 08-18/19 | n-gram-evaluator prototype track | all performance numbers; "pending" items |
+| `ngram_judge_robustness.md` | 2026-08-22 | side study, still governs | — |
+| `phase5_status.md` | 08-22/23 | G5 record | `elbo_polish` recorded with the choice term; carry-overs |
+| `phase6_status.md`, `phase6_writeup.md` | 08-23 → 08-25 | the Phase-6 verdict | Borg cause (first account); uncovered-symbol charge (writeup); carry-overs; corridor |
+| `confidence_mask_probe.md` | 2026-08-24 | pre-registered probe + negative result | header line |
+| `race_polish_plan.md` | 2026-08-25 | plan + PoL; source of the Borg-objective finding | header framing |
+| `wordhom_study.md` | 08-24/25 | fifth head; plain-SA baseline; first VMS wordhom numbers | every "≥ 8" / "unsolvable" sentence |
+| `alt_loop_plan.md` | 08-25 → 08-30 | **running log of the solver of record** (§7–§10) | plan header; §7.7/§8–8.5 "judge in acceptance" recommendations |
+| `altloop_vms_plan.md` | 08-25 → 08-29 | the two manuscript loop runs (§12, §13) | banner; "option B" next steps; §13 tok/type claims |
+| `diffusion_guided_search_method.md` | 08-25 → 09-01 | cold-read method note (re-seeding stage) with §4 wall correction | round budget; "not done" |
+| `wordhom_throughput.md` | 2026-08-26 | engineering note | — |
+| `wordhom_battery_restart.md` | 2026-08-29 | pause note; pre-stated readings for §10 | state table |
+| `wordhom_bigram_variant.md` | 08-30/31 | `d5b20` study; only record of the A-like Latin call | — |
+| `lexical_coverage_note.md`, `judge_alternatives.md` | 08-28 / 08-29 | judge probes | "adopt as criterion" wording |
+| `voynichesque_nocontent_restart.md` | 2026-08-31 | restart note + results of the strict-negative twins | state table |
+| `polygraphia_digitization_scope.md`, `polygraphia_status.md` | 2026-08-31 | plan / record of the quarantined anchor | scope assumptions; "future asset" |
+| `vms_doubling_rate.md`, `vms_token_length_by_hand.md` | 08-20 → 08-26 | side studies feeding the wordhom hypothesis | "untestable at 3–5 tokens/type" |
+| `reference_docs/*` | pre-2026-08-18 | design and plan as pre-registered; **not edited** | abstract headline; design §8 outer tier |

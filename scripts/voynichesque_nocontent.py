@@ -15,6 +15,15 @@ the glyph heads, 0.19-0.79 under naibbe), that band was glyph grammar, not
 leaked content, and the twins become the legitimate "Voynich-shaped
 gibberish" negative for every head.
 
+Result (2026-08-31, analysis/phase6/controls_nocontent/report.json;
+docs/voynichesque_nocontent_restart.md "Results"): mixed. The homophonic
+band was content-inflated — twin − real = −0.27 bits/char on 27/27 pairs
+(real 0.85–1.51 → twin 0.55–1.24); sub1to1 (−0.02) and naibbe (+0.02)
+reproduced, i.e. pure glyph grammar. Strict-gibberish ceiling 1.40; 0/66
+cells language-like, 9/9 instances abstain; the Phase-6 P0 near-miss
+italian/t1 (1.51) falls to 1.14–1.24. The real-text ``voynichesque`` control
+is therefore a wrong-hypothesis control, these twins are the strict negative.
+
 Stages: this script only GENERATES (instances + manifest, Phase-6 format).
 Solve / score / report reuse scripts/vms_controls.py verbatim:
 

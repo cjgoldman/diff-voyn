@@ -1,5 +1,7 @@
 # Alternative language judges for partial decodes — team exploration (2026-08-29)
 
+> **Record status (banner added 2026-09-01):** exploration of 2026-08-29 (five one-day probes). As of 2026-09-01 **nothing in this file is implemented, pre-registered or adopted**: no `rare_aware_margin`/`lexdens7`/learned-judge code exists as a reportable statistic, `docs/judge2_rule.md` was never written, no threshold is frozen, and the frozen `vms/apply.py::ABSTAIN_RULE` (plain ≤ 3.0 AND margin ≥ 1.5) remains the only judge. The table's "adopt as criterion 2/3" verdicts are corrected below to "survives — recommended, not adopted". The wordhom battery it says is "running" completed 2026-08-30 (`docs/alt_loop_plan.md` §10) but has not been scored on any candidate. **Current project position: `docs/project_status.md`** (§1 "Judge of record", §4, §6 "Judge").
+
 ## The problem
 
 The frozen judge (`vms/apply.py::ABSTAIN_RULE`: plaintext ≤ 3.0 bits/char AND
@@ -7,19 +9,30 @@ structure margin ≥ 1.5, margin = bits(letter-shuffled decode) − bits(decode)
 under the Phase-C diffusion evaluator) cannot call a *partial* decode. The
 margin falls ~0.085 bits/char per 0.01 SER and crosses 1.5 at SER ≈ 0.10
 (German) / 0.045 (Latin) / < 0.03 (Italian, whose truth is only 1.56)
-(`docs/alt_loop_plan.md` §8.7). The wildcard→anneal loop leaves residuals at
-SER 0.05–0.24, so a decode that a fluent reader would read at a glance is
-scored "not language". Previously refuted: blanking low-confidence letters
+(`docs/alt_loop_plan.md` §8.7). The loop leaves residuals at SER 0.13–0.24
+after the wildcard stage alone and 0.05–0.12 after the anneal stage
+(`docs/alt_loop_plan.md` §8.4, §8.6; *corrected 2026-09-01, originally read
+"The wildcard→anneal loop leaves residuals at SER 0.05–0.24"*), so a decode
+that a fluent reader would read at a glance is scored "not language".
+*[Note 2026-09-01: the German and Latin anneal finals (SER 0.05 / 0.066–0.073)
+ARE called by the frozen judge (margins 2.13 / 1.70–1.72); only the Italian
+final (0.12, margin 1.39; truth 1.56) is not — `docs/project_status.md` §5.8.]* Previously refuted: blanking low-confidence letters
 (`docs/confidence_mask_probe.md` §9); exact-word lexical coverage works for
 German/Italian but leaks on Latin (`docs/lexical_coverage_note.md`).
 
 Five explorers took one family each and ran cheap probes on the existing
 `judge_at_ser` keys (A-like wordhom truth, uniform/rare-first corruptions at
 recorded SER, loop finals, stuck keys), the wordhom/Phase-6 control decodes
-and the 87 VMS cells. Scratch code and JSON artefacts:
-`/tmp/claude-1000/-workspace/*/scratchpad/{lexical,slope,learned,noisychannel}/`
-(session-local; nothing tracked was modified, no threshold has been frozen).
-The full per-family reports are in the same directory (`*_report.md`).
+and the 87 VMS cells. Scratch code and JSON artefacts lived in the
+session-local scratchpad
+(`/tmp/claude-1000/-workspace/*/scratchpad/{lexical,slope,learned,noisychannel}/`;
+nothing tracked was modified, no threshold has been frozen). *[Status
+2026-09-01: that scratchpad no longer exists and the per-family
+`*_report.md` files were NOT preserved — this document is the only record of
+the probes. What survives under `DATA_ROOT/analysis/altloop/` is the
+2026-08-28 material the probes built on: `judge_at_ser*.{json,md}` and
+`lexical_coverage_k{5000,20000}_l{5,6}.json` (L ≥ 5/6 coverage; the L ≥ 7
+density statistic itself was never re-run outside the scratchpad).]*
 
 ## Why the current judge fails — the shared diagnosis
 
@@ -66,8 +79,8 @@ cipher-invariant pattern statistics (Hauer & Kondrak 2016).
 | family | statistic | callable SER (la / it / de) | negatives | verdict |
 |---|---|---|---|---|
 | frozen rule (reference) | structure margin ≥ 1.5 | 0.045 / < 0.03 / 0.10 | voynichesque ≤ 1.26 (Phase-6 heads), ≤ 0.66 (wordhom head) | baseline |
-| **rare-aware margin** (slope explorer §3) | paired margin charged only at positions whose own type and ±2 neighbour types have ≥ 10 occurrences; nothing masked | loop finals SER 0.17 / 0.21 / 0.13 → 1.69 / 1.35 / 2.04 (full margin 1.01 / 0.83 / 1.42); rare@0.65 (SER 0.23) → 1.67 / 1.46 / 1.93 | fall: max 0.80 (contamination), voynichesque ≤ 0.68, VMS 0.25–0.50 | **adopt as criterion 2**; needs 4-seed replicate (SEM ≈ 0.13 at 400–600 charged positions) and own threshold |
-| **lexical density** (lexical explorer) | distinct exact top-5000 words of length ≥ 7 per 1000 chars, minus shuffle; per-language threshold 0.35 × held-out median | ≈ 0.12 / 0.10 / 0.12 on the worst of 8 corruption seeds at 3000 chars (mean on threshold at 0.20); anneal finals score at or above truth | all ≤ 0.34 normalised (max: Spanish contamination under Italian, wordhom voynichesque); VMS ≤ 0.19 | **adopt as criterion 3**; Latin now separates 4–8×; fuzzy matching REJECTED (helps n-gram-fitted negatives more: max-neg/truth 0.91 → 1.01 Latin); stem lexicon inferior |
+| **rare-aware margin** (slope explorer §3) | paired margin charged only at positions whose own type and ±2 neighbour types have ≥ 10 occurrences; nothing masked | loop finals SER 0.17 / 0.21 / 0.13 → 1.69 / 1.35 / 2.04 (full margin 1.01 / 0.83 / 1.42); rare@0.65 (SER 0.23) → 1.67 / 1.46 / 1.93 | fall: max 0.80 (contamination), voynichesque ≤ 0.68, VMS 0.25–0.50 | **survives — recommended as criterion 2, NOT adopted** *(corrected 2026-09-01; originally read "adopt as criterion 2"; never implemented or pre-registered)*; needs 4-seed replicate (SEM ≈ 0.13 at 400–600 charged positions) and own threshold |
+| **lexical density** (lexical explorer) | distinct exact top-5000 words of length ≥ 7 per 1000 chars, minus shuffle; per-language threshold 0.35 × held-out median | ≈ 0.12 / 0.10 / 0.12 on the worst of 8 corruption seeds at 3000 chars (mean on threshold at 0.20); anneal finals score at or above truth | all ≤ 0.34 normalised (max: Spanish contamination under Italian, wordhom voynichesque); VMS ≤ 0.19 | **survives — recommended as criterion 3, NOT adopted** *(corrected 2026-09-01; originally read "adopt as criterion 3"; never implemented or pre-registered)*; Latin now separates 4–8×; fuzzy matching REJECTED (helps n-gram-fitted negatives more: max-neg/truth 0.91 → 1.01 Latin); stem lexicon inferior |
 | **learned judge** (learned explorer) | logistic regression on language-symmetric features: Phase-4 LID head (max-prob, entropy, abstain, 2nd) + denoiser posterior profile (`heads/posterior.py`, mask 0.3, 8 draws); threshold 5 % FPR | 1.00 call rate at SER ≤ 0.15 in every language under leave-one-language-out; 0.70–1.00 at 0.20 | shuffle / voynichesque / random key 0.00–0.03; **soft band** wrong keys SER 0.45–0.60 leak 0.05–0.97 (corrupted German ≈ clean Italian) | **strongest tolerance, weakest validity**; pursue as the acceptance instrument only with the soft band and real search residuals in the negative set; fairness = symmetric data + pre-registration, not a bound |
 | LID head alone | Phase-4 head argmax | language correct ≥ 0.97 through SER 0.30, 0.92 at 0.45 | abstain class fires 0 % on wrong keys to SER 0.75 | error-tolerant *language namer*, useless *rejector* (Phase-4 caveat, now quantified) |
 | noisy-channel repair (noisychannel explorer) | 5-gram Viterbi repair, λ = 7–9 bits/edit, then frozen judge; also "charged" margin adding λ × edits | SER falls only 0.10 → 0.08, 0.20 → 0.16; margin *drops* (German anneal 2.17 → 1.25–1.56, Latin 1.77 → 1.10–1.23; uni@0.10 1.55 → 1.05–1.25) | negatives also drop (voyn 0.66 → 0.12–0.24) but the positive/negative gap does not widen (charged: German uni@0.15 2.03 vs voyn 1.65; original 1.26 vs 0.66) | **reject**; DiD < 0 everywhere, per-language false-edit bias (clean German 0.5 % vs Latin 1.2 % rewritten at λ = 7 — an R1 violation), and the repairer *worsens* the anneal finals (0.050 → 0.054, 0.069 → 0.076: their residual errors sit at the n-gram optimum); the denoiser-posterior version was also negative — iterative argmax re-fill *raises* SER (0.10 → 0.14, clean text gains 5–9 % errors) |
@@ -111,6 +124,13 @@ cipher-invariant pattern statistics (Hauer & Kondrak 2016).
    measured, on that head). The manuscript-shaped wordhom battery
    (`analysis/altloop/battery`, chains running) is the right enlargement and
    must be scored on every candidate before any threshold is fixed.
+   *[Superseded 2026-08-30: the battery is COMPLETE — 12 negatives + 6
+   cross-language cells all NOISE ≤ 0.48, clean German/Latin positives
+   called, Italian below 1.5 (`docs/alt_loop_plan.md` §10); its instances
+   live under `DATA_ROOT/analysis/wordhom/battery/`, the loop runs under
+   `analysis/altloop/runs<tag>.json`. As of 2026-09-01 none of the three
+   candidate statistics has been scored on it — `docs/project_status.md` §6
+   "Judge".]*
 
 ## Recommended programme (pre-register before any manuscript number is re-read)
 

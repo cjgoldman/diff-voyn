@@ -38,6 +38,16 @@ scale at which ``ladder.elbo_polish`` was shown to select on noise
 (``docs/phase6_status.md``, Borg), so the outer tier is shortlist rescoring
 + MDL selection only.
 
+That search (:meth:`WordHomophonicHead.solve`) is the plain-SA BASELINE:
+it recovers keys only at ≥ 8 tokens per type (``docs/wordhom_study.md``).
+The production solver — the hapax-as-wildcard objective (``wild_types``,
+2026-08-27) with wildcard→anneal re-admission (2026-08-28) driven by the
+diffusion-guided loop in ``heads/altloop.py`` — lives in
+``scripts/altloop_pol.py`` / ``scripts/altloop_vms.py`` (``--wild``,
+``--wild-anneal``; ``docs/alt_loop_plan.md`` §8) and solves to ≈ 4 tokens
+per type (``docs/project_status.md`` §3; CLAUDE.md "Solver selection
+convention").
+
 Identifiability caveat (the reason the arithmetic existed): a word type
 seen once constrains nothing. Running the head on the top-K types only and
 dropping the rest was tried first and fails on its own positive control —

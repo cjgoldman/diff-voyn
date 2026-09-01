@@ -4,6 +4,13 @@
 > restart; see `docs/phase3_status.md`. Kept as the record of the interruption
 > and of the resume procedure (the GPU/CPU command lists below were executed
 > as written; the 3.2 budget criterion was amended rather than extended).**
+>
+> **Record status (banner extended 2026-09-01):** interruption record, 2026-08-21 (G3 PASS
+> 2026-08-21 23:00 UTC). The GPU/CPU command blocks and the "Docs to finish" list were
+> executed as written; nothing here is a pending action. The "Gotchas" section is still
+> useful. The `v3-ro` table it installs was superseded by `v3-phase_c-ro` on 2026-08-22
+> (`docs/phase4_status.md`), and the Phase-B weights it scores by `phase_c-85m-seed0`.
+> **Current project position: `docs/project_status.md`.**
 
 `torch.cuda.is_available()` went False mid-phase (NVML "Unknown Error",
 `/dev/nvidia*` still present — same condition as the 2026-08-20 "gpu

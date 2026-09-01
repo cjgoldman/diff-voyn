@@ -2,7 +2,11 @@
 cells (docs/alt_loop_plan.md §8.5).
 
 The hapax-wildcard diffusion-guided loop leaves the A-like wordhom cells at
-letter SER 0.13 (German) / 0.17 (Latin) / 0.21–0.24 (Italian). Question: does
+letter SER 0.13 (German) / 0.17 (Latin) / 0.21–0.24 (Italian) (wildcard-only
+finals, 2026-08-27; the anneal stage later brought these to 0.05 / 0.07 /
+0.12 — docs/alt_loop_plan.md §8.6 — and this script scores those finals too,
+via ``--run-tags``; the German and Latin anneal finals ARE called,
+docs/project_status.md §5.8). Question: does
 the frozen Phase-6 judge (per-language calibrated ELBO, letter-shuffle
 structure margin, ``ABSTAIN_RULE``) call the language at those error
 levels, and where between the recovered key (SER ≈ 0) and the stuck start

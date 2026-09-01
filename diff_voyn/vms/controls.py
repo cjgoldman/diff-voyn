@@ -6,10 +6,17 @@ the manuscript runs through (same heads, same outer tier, same MDL scale,
 same abstention rule), with its truth attached for the report:
 
 ``voynichesque``  (must abstain)
-    Output of the pinned ``voynichesque.py`` (structured gibberish with no
-    recoverable plaintext) on held-out windows of each inventory language;
-    presented as the EVA-like character stream (rungs 1–2) and as word
-    tokens (rung 3, Naibbe-parseable subset with coverage).
+    Output of the pinned ``voynichesque.py`` on held-out windows of each
+    inventory language — structured gibberish GENERATED FROM REAL TEXT whose
+    token types deterministically encode 1–3-letter plaintext chunks, i.e. a
+    wrong-hypothesis control, NOT a strict negative (its homophonic-head
+    margins are content-inflated by ≈ 0.27 bits/char: the letter-shuffled
+    source twins under control tag ``voynichesque_nocontent``,
+    ``scripts/voynichesque_nocontent.py``, 2026-08-31, are the strict
+    negative; docs/project_status.md §5.6. Corrected 2026-09-01, originally
+    read "structured gibberish with no recoverable plaintext"); presented as
+    the EVA-like character stream (rungs 1–2) and as word tokens (rung 3,
+    Naibbe-parseable subset with coverage).
 
 ``shuffled``  (must abstain)
     A held-out window with its letters randomly permuted — the unigram

@@ -1,5 +1,7 @@
 # Polygraphia digitization — status
 
+> **Record status (banner added 2026-09-01):** record of the 2026-08-31 digitization session; still the most recent statement on Polygraphia. **Read §5 first: Trithemius/Polygraphia is QUARANTINED from every control-set workflow (user decision 2026-08-31, also in `CLAUDE.md`)** — the §4 "provisional anchor" is NOT a usable anchor or control; its cyclic cells are the pipeline's first false CALLS (margins 1.76–1.96 at SER 0.74–0.77). Transcription is paused at 92/692 columns (§3); every §6 item is gated on the user's explicit say-so. **Current project position: `docs/project_status.md`** (§2 row 2026-08-31, §4, §6 "Anchors / data").
+
 *2026-08-31. Scope: `docs/polygraphia_digitization_scope.md`. This records
 what is built, what the sources actually contain (three scope assumptions
 died on contact with the scan), and the provisional-anchor results.*

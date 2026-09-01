@@ -1,6 +1,8 @@
 # Confidence-masked judging: would the diffusion judge do better on a decode with its low-confidence letters blanked?
 
-*Proposal / pre-registered test plan, 2026-08-24. Nothing here has been run.*
+> **Record status (banner added 2026-09-01):** pre-registered 2026-08-24, run 2026-08-24, **not adopted** — see §9. §§1–8 are the plan as frozen before any number was computed; §9 records the result (E1 FAIL, E3 oracle ceiling +0.056 vs the required +0.15). The machinery (`heads/masked_bits.py`, `heads/confidence.py`, `scripts/confidence_probe.py`) stays in the tree as a probe. The "what survives" items were not pursued as masks; the denoiser posterior was built the next day as a *re-seeding proposal* instead (`heads/posterior.py`, `docs/alt_loop_plan.md` §7). **Current project position: `docs/project_status.md`.**
+
+*Pre-registered test plan, 2026-08-24; run the same day and not adopted (§9).* *(Corrected 2026-09-01; originally read "Proposal / pre-registered test plan, 2026-08-24. Nothing here has been run." — the header was never updated when §9 was added.)*
 
 ## 1. The question
 
@@ -65,7 +67,7 @@ because the margin is the load-bearing statistic.
 
 ## 3. Definitions
 
-Existing untracked scaffolding (written 2026-08-24, no tests/results yet):
+Existing untracked scaffolding (written 2026-08-24, no tests/results yet) *[plan-time text; the tests (11, `tests/test_masked_bits.py`, `tests/test_confidence.py`) and results exist — §9]*:
 
 - `heads/masked_bits.py::paired_bits_masked(evaluator, rows, observed, conditions)`
   — blanks sit at `MASK` in `z_t` for every stratum (context, never target);
@@ -361,6 +363,16 @@ was not run.
    (AUROC ≈ 0.6); a search that produces posterior marginals per symbol
    (e.g. the Sinkhorn head's soft assignment, or a bootstrap over inner
    restarts) is the natural candidate, and it must be language-shared.
+   *[Note added 2026-09-01: a per-symbol posterior from the denoiser itself
+   was built 2026-08-25 (`heads/posterior.py`) but used as a *proposal* —
+   re-seeding the symbols whose posterior disagrees with the key inside the
+   alternating n-gram ↔ diffusion loop (`docs/alt_loop_plan.md` §7) — not
+   as a confidence mask for judging; confidence-masked judging was not
+   retried. The 2026-08-29 judge-alternatives study found different
+   survivors (rare-aware margin, lexical density ≥ 7, learned LR — none
+   pre-registered or adopted; `docs/judge_alternatives.md`). The order-k
+   surrogate shuffles and conditional − unconditional gap of item 2 were
+   not pursued.]*
 2. The structure margin is a *context-limited* statistic: anything that
    thins the observed sequence shrinks it for true decipherments first. That
    argues for the alternative nulls discussed in the review — order-k

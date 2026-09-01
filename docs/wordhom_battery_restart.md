@@ -1,5 +1,8 @@
 # Wordhom battery — restart notes (paused 2026-08-29 ~15:20 UTC)
 
+> **Record status (banner added 2026-09-01):** SUPERSEDED — operational pause note of 2026-08-29; the battery was restarted the same day, completed 2026-08-30 and written up as `docs/alt_loop_plan.md` §10 (commits dcd5600 … b4a62e2).
+> Kept for the pre-stated readings ("Readings to make"), which are the pre-registration record for §10. Everything in the state table, "After the German pass" and "Uncommitted changes" is done. **Current project position: `docs/project_status.md`.**
+
 Purpose: manuscript-shaped controls for the wildcard→anneal word-homophonic
 pipeline (`docs/alt_loop_plan.md` §8.4–8.7) before an exhaustive treatment.
 Requested items: (1) B-like positive, (2) A- and B-like negatives,
@@ -12,12 +15,13 @@ The container lost GPU access mid-session: `torch.cuda.is_available()` →
 False, `nvidia-smi` → "Failed to initialize NVML: Unknown Error", opening
 `/dev/nvidia0` → EPERM although the nodes exist (device-cgroup access dropped).
 Fix = restart the container from the host. Nothing GPU-side has run yet.
+*[Superseded: the battery ran to completion 2026-08-29/30 — `docs/alt_loop_plan.md` §10.]*
 
 ## State on disk (all done, nothing to redo)
 
 | item | where |
 |---|---|
-| builder / solver / report script | `scripts/wordhom_battery.py` (new, uncommitted) |
+| builder / solver / report script | `scripts/wordhom_battery.py` (new, uncommitted) *[committed in dcd5600, 2026-08-29]* |
 | loop generalised for battery cells | `scripts/altloop_pol.py --battery --cells NAME:HYP` (WHCell tolerates missing / other-language truth; SER `None` when no plaintext) |
 | judge generalised | `scripts/judge_at_ser.py --battery NAME:HYP --run-tags … --tag …` (keys: stuck, truth if hypothesis = generating language, finals of the run tags) |
 | 21 instances + manifest | `data/analysis/wordhom/battery/wordtypesall/` |
@@ -33,6 +37,7 @@ Blike 30 000 / 7 200 (5.6). Voynichesque draws selected by tokens/type (A 4.4–
 B 6.0–6.4). B-like positive and cross-language cells reuse
 `positive/german/{Blike,Alike}` from `analysis/wordhom/controls/wordtypesall` with
 their `controls_solves.json` starts. Latin/Italian instances exist but are NOT solved.
+*[Done 2026-08-29/30: all three languages solved and run — `docs/alt_loop_plan.md` §10.1.]*
 
 ## Restart procedure
 
@@ -89,7 +94,9 @@ Solve and run Latin/Italian: `uv run python scripts/wordhom_battery.py --stage s
 tags to the report. Add seed 2 (`SEEDS=2`) for the cells that matter. Then write up
 in `docs/alt_loop_plan.md` (new §10) and update the memory note.
 
-## Uncommitted changes
+*[Done: Latin/Italian run 2026-08-29/30 (tags `_bat_*_{l0,l1,l1b,i0,i1,x1}`), seed 1 added on the three borderline positives, written up as `docs/alt_loop_plan.md` §10 on 2026-08-30.]*
+
+## Uncommitted changes *[resolved: committed 2026-08-29 in dcd5600]*
 
 `scripts/wordhom_battery.py` (new), `scripts/altloop_pol.py`, `scripts/judge_at_ser.py`
-— commit once the first cells confirm the pipeline runs end to end.
+— committed in dcd5600 (2026-08-29) with this note; follow-ups 86efd16 (`nodouble`), 7d4991f (`MAX_OWN_BPC` resample), b4a62e2 (`revdouble`).

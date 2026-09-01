@@ -12,6 +12,14 @@ Nothing here touches the Phase-6 record (ABSTAIN_RULE, controls, the 87
 cells); this is a new search on top of it, reported separately. The
 "promising" tiers are fixed in ``heads.altloop`` (§5) before any manuscript
 number is read.
+
+Solver convention (CLAUDE.md, 2026-08-31): the production wordhom solve is
+``--wild`` (hapax-as-wildcard objective) and then
+``--wild-anneal START,END --start-from <wild tag>`` with ``--patience`` ≥ 10
+(recorded runs: ``--wild-anneal 0,40 --patience 10 --rounds 80``;
+docs/alt_loop_plan.md §8.4–8.6, §10). The plain defaults (``--rounds 6
+--patience 2``, ``--wild`` off) are the 2026-08-25 proof-of-life baseline
+and are kept unchanged so the recorded §12 runs reproduce.
 """
 
 from __future__ import annotations

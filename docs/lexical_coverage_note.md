@@ -1,5 +1,7 @@
 # Lexical coverage as a human-shaped call criterion (2026-08-28)
 
+> **Record status (banner added 2026-09-01):** probe of 2026-08-28 (K = 5000, L ≥ 5 exact-word *coverage*). Superseded as a candidate criterion on 2026-08-29 by the L ≥ 7 exact-word lexical *density* statistic in `docs/judge_alternatives.md`, which does separate Latin; findings 1, 4 and 5 (residual errors are lexically free; VMS in the negative band; not a replacement for the frozen rule) still stand. No threshold from either file is pre-registered, implemented or adopted — the frozen `ABSTAIN_RULE` remains the only judge. **Current project position: `docs/project_status.md`** (§4, §6 "Judge").
+
 Question: a reader recognises "Italian with 15 % letter errors" easily; the
 frozen structure-margin rule (≥ 1.5 bits/char) does not. Is a
 word-recognition statistic a better second criterion?
@@ -42,6 +44,10 @@ shuffled text "covered", Latin truth called German).
    negatives are real Latin leaking through a wrong cipher, so a weak Latin
    detector cannot tell the two apart. The structure margin is the better
    Latin instrument (truth 1.9 vs voynichesque ≤ 1.26).
+   *[Superseded 2026-08-29: with distinct exact words of length ≥ 7 per 1000
+   chars (lexical *density*, threshold 0.35 × the language's held-out median)
+   Latin separates 4–8× — `docs/judge_alternatives.md` table row "lexical
+   density"; `docs/project_status.md` §4. Still a candidate only, not adopted.]*
 4. **The manuscript sits in the negative band** on every head (max 0.28,
    homophonic/German — the same head/language that tops the voynichesque
    negatives), below every positive at truth. Consistent with the abstention.
@@ -50,6 +56,10 @@ shuffled text "covered", Latin truth called German).
    must be pre-registered per language before reading manuscript numbers.
    Reasonable use: a second, *per-language* criterion (Italian/German only)
    for synthetic-positive calls, or a diagnostic alongside the margin.
+   *[Superseded 2026-08-29: `docs/judge_alternatives.md` proposes the L ≥ 7
+   density for all three languages inside a rule "frozen rule OR [rare-aware
+   margin AND lexical density]" — a recommendation, not pre-registered and
+   not adopted as of 2026-09-01 (`docs/project_status.md` §6 "Judge").]*
 
 Note: the Phase-6 `naibbe` candidates' stored `decode` is not the final
 decode (SER 0.31–0.78 vs truth) — excluded from the positive band above.

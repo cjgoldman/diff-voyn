@@ -1,5 +1,14 @@
 # Phase 4 — Language-ID head (delayed, then joint): status
 
+> **Record status (banner added 2026-09-01):** Phase 4 / LID head and Phase-C joint fine-tune,
+> 2026-08-22 (G4 PASS ~09:00 UTC). **Still current as of 2026-09-01:** the evaluator
+> `phase_c-85m-seed0/ckpt_final.pt` and calibration table `v3-phase_c-ro` named in the verdict
+> (frozen for Phase 5, unchanged since); the head's role as a short-text cross-check, not a
+> wrong-key abstention instrument; task 4.7 (25M seed replication, P2) is **still paused** at
+> the checkpoints listed in §4.7. Superseded or discharged items in the carry-overs and the
+> post-hoc assessment carry inline notes. **Current project position:
+> `docs/project_status.md`.**
+
 Status record for Phase 4 of the [task breakdown](../reference_docs/Diffusion%20Model%20Training%20-%20Task%20Breakdown.md)
 (design §6, §7.2; requirement R1 via the G4 canary). Started 2026-08-22 after
 Gate G3 (`docs/phase3_status.md`). Code: `diff_voyn/model/lid_head.py`,
@@ -237,6 +246,10 @@ decipherments + 750 shuffled controls, even/odd trials):
   A length-dependent temperature would be the next refinement if the head
   is ever used quantitatively; the calibrated head lives in
   `runs/phase_c-85m-seed0/lid_head_calibrated.pt`.
+  *[Still not done as of 2026-09-01 (`docs/project_status.md` §6). The head was never
+  used quantitatively; the 2026-08-29 learned-judge probe confirmed that its abstain
+  class never fires on wrong-key decodes (memory `learned-judge-probe`,
+  `docs/judge_alternatives.md`), consistent with the 4.2 finding above.]*
 - **Head vs ELBO agreement** on the true-hypothesis decipherments
   (ELBO winner under `v3-phase_c-ro`):
 
@@ -289,6 +302,11 @@ uv run python scripts/seed_replication.py --report && uv run python scripts/g4_c
 Nothing in the G4 gate wording depends on 4.7 (P2); the ranking-stability
 statistic it will add is an error bar for the Phase-6 report, not a
 precondition for Phase 5.
+*[Status check 2026-09-01: still paused exactly as tabled — `analysis/phase4/
+seed_replication.md` reads "Complete: False, seeds scored ['0']", the seed-1/2
+`ckpt_last.pt` files are dated 2026-08-22, no `phase_b/phase_c-25m-seed{1,2}` runs
+exist. Phase 6 (2026-08-24) reported without the 4.7 error bar.
+`docs/project_status.md` §6.]*
 
 ## Gate G4 — verdict: **PASS** (2026-08-22 ~09:00 UTC; 4.7 paused, resumable)
 
@@ -330,6 +348,7 @@ calibrated head in `lid_head_calibrated.pt`), with the 25M sibling
   decipherments (4.2 finding) — that is the ELBO's shuffled-text margin.
   Below 128 chars its abstain rate on negative controls falls to ~95%;
   a length-dependent temperature is the next refinement.
+  *[Not done as of 2026-09-01; see the note under §4.6.]*
 - **λ for any future joint phase**: start the cap at 0.006, not 0.05 — the
   10% rule lands at 0.003 on both sizes with a 12-window LID batch.
 - **4.7 is paused, not dropped**: resume per §4.7 when a GPU is free
@@ -337,7 +356,7 @@ calibrated head in `lid_head_calibrated.pt`), with the 25M sibling
   and add the ranking-stability numbers to the Phase-6 error bars.
 - **Uncommitted state**: the Phase-3 and Phase-4 work is in the working
   tree (the Phase-3 files were modified but not committed before Phase 4
-  began).
+  began). *[Committed 2026-08-22 ("phase 4 complete"); no longer applies.]*
 
 ## Assessment after the n-gram judge side study (2026-08-22)
 
@@ -383,6 +402,8 @@ findings say about the merits and goals of the project so far.
   differentiable-heads result to the architecture. A cheap control (retrain
   the n-gram LMs on the Phase-B mixture; optionally give the AR reference v3
   the same curriculum) would make the attribution rigorous.
+  *[Not run as of 2026-09-01 (`docs/ngram_judge_robustness.md` §3 records it as
+  unmeasured; `docs/project_status.md` §6 open register).]*
 - **The plateau cuts both ways for Phase 6.** Scoring a half-wrong key the
   same as a fully wrong one is fine for shortlists, but on the VMS, if no
   cipher hypothesis gets near a key, every (cipher × language) cell sits on
@@ -399,6 +420,13 @@ findings say about the merits and goals of the project so far.
   judge is symmetric; the search is not yet proven to be. Phase-5 acceptance
   should include per-language solve success on matched synthetic
   difficulty, not only aggregate recovery.
+  *[Partially discharged: Phase 5 (G5, 2026-08-23) reported per-language solve
+  behaviour at every rung and recorded "Latin is the hard language for the n-gram inner
+  search at every rung" (`docs/phase5_status.md`). Later qualified: Latin held-out
+  document 0 is a 4.66-bits/char drug-recipe list carrying 10 % of the held-out weight
+  (2026-08-30, `docs/alt_loop_plan.md` §10; memory `latin-pharmacopoeia-doc`), so part of
+  "Latin is hard" is the split, not the language — check the Latin plaintext bpc before
+  reading a Latin solve failure as search asymmetry. `docs/project_status.md` §6.]*
 
 ### Net
 

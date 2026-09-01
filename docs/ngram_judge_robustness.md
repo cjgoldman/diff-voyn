@@ -1,5 +1,13 @@
 # Robustness of the prototype n-gram language judges vs the diffusion judges
 
+> **Record status (banner added 2026-09-01):** side study, 2026-08-22 (after G4). Its
+> conclusions — the n-gram cost never saturates under a wrong key while the diffusion cost
+> does; n-gram language judges drift to "German" under any corruption; the Phase-C judge's
+> robustness is the curriculum, not the architecture — still govern and are carried verbatim
+> in `CLAUDE.md`. Nothing here is superseded; the one loose end (an n-gram LM retrained on
+> the noised mixture, §3) is still unmeasured as of 2026-09-01 (`docs/project_status.md` §6).
+> **Current project position: `docs/project_status.md`.**
+
 Side study, 2026-08-22 (after G4). Question: the Phase-2 robustness curve
 (task 2.6) characterizes how the diffusion evaluator degrades under partial
 decipherments; how do the **CH.0 n-gram judges** — the interpolated

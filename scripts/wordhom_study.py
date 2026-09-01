@@ -1,6 +1,12 @@
 """Post-Phase-6 study — Boxer's hypothesis without the arithmetic: a
-word-level homophonic cipher over letters + the language's top-5 bigrams
-with the repeat rule (``diff_voyn/heads/wordhom.py``), through the Phase-6
+word-level homophonic cipher over letters + the language's top-5 DOUBLED
+letters (ss/ll/tt …, unit spec ``d5``; NOT frequent bigrams — that reading
+fails the doubling-rate control; corrected 2026-09-01, originally read
+"top-5 bigrams") with the repeat rule (``diff_voyn/heads/wordhom.py``).
+This script's ``solve`` stage is the plain multi-restart SA baseline
+(findable only at ≥ 8 tokens/type); the solver of record is the
+wildcard→anneal loop in ``scripts/altloop_vms.py`` (CLAUDE.md "Solver
+selection convention", docs/project_status.md §3). Through the Phase-6
 pipeline (same frozen evaluator, outer tier, MDL scale, abstention rule,
 control battery).
 

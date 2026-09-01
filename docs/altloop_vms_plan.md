@@ -1,6 +1,9 @@
 # Plan — diffusion-guided n-gram search on the manuscript, with controls in every cell
 
-Status: **COMPLETE 2026-08-26 — null result, see §12.** Was: RUNNING 2026-08-25 — `scripts/altloop_vms.py` implemented (tests in `tests/test_altloop.py`); wordhom and homophonic launched 23:10 UTC (GPU 0/1), sub1to1 queued. Implementation note: start keys are the `vms_solves.json` MDL-pick n-gram candidates (§2), not the Phase-6 ELBO-polished keys — the polished key sits ~6500 nats below the n-gram optimum, so an n-gram-accepting loop leaves it in round 1 on every arm. Follows `docs/alt_loop_plan.md` §7
+> **Record status (banner added 2026-09-01):** the two manuscript runs of the alternating loop — §12 posterior re-seeding (2026-08-25/26, 72/72 cells NOISE) and §13 wildcard → anneal, the solver of record (2026-08-28/29, 24/24 NOISE).
+> Still current: both results and the §1 caveat. Superseded: the "option B" next steps of §11, §12 and §13 (judge in the acceptance rule tested 2026-08-28 with no gain, `docs/alt_loop_plan.md` §8.5; manuscript-shaped battery run 2026-08-29/30, §10 there); §13's tokens-per-type claims about the synthetic traps (they are 4.1–4.4 tokens/type, ~45 % hapax types, not 3.0 / 74 %) and its under-report of the Latin call — corrected in place. **Current project position: `docs/project_status.md`.**
+
+Status: **COMPLETE 2026-08-26 — null result, see §12.** *[and §13, 2026-08-28/29: the wildcard → anneal run, 24/24 NOISE.]* Was: RUNNING 2026-08-25 — `scripts/altloop_vms.py` implemented (tests in `tests/test_altloop.py`); wordhom and homophonic launched 23:10 UTC (GPU 0/1), sub1to1 queued. Implementation note: start keys are the `vms_solves.json` MDL-pick n-gram candidates (§2), not the Phase-6 ELBO-polished keys — the polished key sits ~6500 nats below the n-gram optimum, so an n-gram-accepting loop leaves it in round 1 on every arm. Follows `docs/alt_loop_plan.md` §7
 (proof of life) under time pressure: the three §7.7 carry-forward items are
 *deferred*, and in their place every manuscript cell runs its own
 same-size random control (`rand-k512` / `rand-k8`) and SA-alone control
@@ -23,6 +26,7 @@ early whether to add compute — for speed, or to fund option B.
   battery never tested the manuscript's 3.0–4.6 tokens-per-type regime. A null
   here is "the method did not find it", not evidence of absence — and the
   Phase-6 abstention stands regardless.
+  *[Superseded 2026-08-28/30: it has since — synthetic cells at 4.1–4.4 tokens/type are solved by the wildcard → anneal solver and ~3.5 is not (`docs/alt_loop_plan.md` §8.6, §10.1); Currier B (4.6) is inside that regime, Currier A (3.0) below it — `docs/project_status.md` §3.]*
 - **Does not change the Phase-6 record.** `ABSTAIN_RULE`, controls and the 87
   cells stay as recorded; this is a new search on top of them, reported
   separately.
@@ -208,6 +212,8 @@ Judge-in-acceptance (`race_polish` confirmation inside the loop), the
 manuscript-shaped synthetic battery, and the VMS regression arm of the race
 study. If §8's first decision point fires, item 3 is the first to fund.
 
+*[Superseded: judge-in-acceptance was tested 2026-08-28 — no gain (`docs/alt_loop_plan.md` §8.5); the manuscript-shaped synthetic battery was run 2026-08-29/30 (§10 there); the race study's VMS regression arm was not run as such, but the manuscript was re-run with the solver of record in §13 below. `docs/project_status.md` §5.2.]*
+
 ## 12. Results (2026-08-25/26)
 
 Implemented as planned (`scripts/altloop_vms.py`, `heads/altloop.py`
@@ -268,6 +274,8 @@ B — the judge inside the acceptance rule (choice term off) and the
 manuscript-shaped synthetic battery to calibrate what a margin in the 0.4–1.0
 band can mean at 3–5 tokens per type. Not run: `naibbe`, `arithmetic` (scope).
 
+*[Superseded: both option-B items were done — the judge in the acceptance rule 2026-08-28 (no gain, `docs/alt_loop_plan.md` §8.5) and the manuscript-shaped battery 2026-08-29/30 (§10 there: same-shape negatives through the same key search stay ≤ 0.48, so a 0.4–1.0 margin at 4–6 tokens per type is the no-content band); neither changed the manuscript verdict. `docs/project_status.md` §5.2.]*
+
 Operational notes: homophonic runs took ~30 s (plan: 5–10 min); wordhom ~1 h
 per cell. The sub1to1 pid-file waiter never fired because the `uv run`
 wrapper lingers as a `<defunct>` zombie that `kill -0` still accepts —
@@ -283,10 +291,9 @@ out of SA and proposals, so the frequent types converge on their own
 context) and a schedule that re-admits the wildcards in batches once the
 frequent types have converged. On synthetic A-like cells that pipeline takes
 the loop from SER 0.6–0.7 to 0.05 (German, **called** under the frozen
-rule), 0.07 (Latin) and 0.12 (Italian). This section runs the same pipeline
+rule, margin 2.13), 0.07 (Latin, **called**, margin 1.70–1.72 on 3 seeds) and 0.12 (Italian, not called at 1.39 — its true key scores only 1.56) *(corrected 2026-09-01; originally read "0.05 (German, **called** under the frozen rule), 0.07 (Latin) and 0.12 (Italian)"; `analysis/altloop/judge_at_ser.md`; `docs/project_status.md` §5.8)*. This section runs the same pipeline
 on the 12 manuscript wordhom cells of §12 — the natural question after §12,
-since those cells are the regime (3.0 / 4.6 tokens per type, 69–75 % hapax
-types) the synthetic traps were built to imitate.
+since those cells are the regime the synthetic traps approximate (the A-like traps are 4.1–4.4 tokens per type with ~45 % hapax types — matched to Currier A's letter and type *counts*, and in tokens per type closer to Currier B's 4.6 than to A's 3.0; the manuscript itself is 3.0 / 4.6 with 74 / 69 % hapax types) *(corrected 2026-09-01; originally read "since those cells are the regime (3.0 / 4.6 tokens per type, 69–75 % hapax types) the synthetic traps were built to imitate"; `docs/project_status.md` §3, §5.9)*.
 
 **Setup** (`scripts/altloop_vms.py --wild --hapax-max 1`, `--wild-anneal
 0,40 --start-from`, `--tag`, `--arms`; records carry the wildcard
@@ -350,10 +357,12 @@ none` on every cell and stage, so the method is blind on the manuscript
 even with the additions that made it work on the synthetic A-like battery.
 This strengthens rather than weakens the §12 statement: the synthetic
 battery now *does* cover a regime where the loop demonstrably recovers a
-key at 3 tokens per type with 74 % hapaxes, and the manuscript cells do not
-behave like it. The Phase-6 abstention stands. Nothing here is a
+key — 4.1–4.4 tokens per type with ~45 % hapax types (Currier B's 4.6 is inside that band; Currier A's 3.0 is below anything ever recovered) — and the manuscript cells do not
+behave like it *(corrected 2026-09-01; originally read "recovers a key at 3 tokens per type with 74 % hapaxes" — nothing at ≤ 3.5 tokens per type has been recovered; `docs/project_status.md` §5.9)*. The Phase-6 abstention stands. Nothing here is a
 decipherment claim in either direction; the remaining honest next step is
 unchanged (§11: judge in the acceptance rule with the choice term off, and
 a manuscript-shaped *negative* battery — voynichesque and wrong-language
 streams at these token statistics — to learn what the 0.3–0.5 margin band
 looks like when there is nothing to find).
+
+*[Superseded 2026-08-28/30: both done — the judge in the acceptance rule (`docs/alt_loop_plan.md` §8.5, no gain) and the manuscript-shaped negative battery (§10.1 there: shuffled and voynichesque A/B streams at 4.2–6.4 tokens/type stay at 0.17–0.37, wrong-language cells 0.39–0.48, so the manuscript's like-for-like 0.36–0.51 sits just above the no-content band). `docs/project_status.md` §5.2.]*

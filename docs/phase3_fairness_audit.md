@@ -1,5 +1,13 @@
 # Phase 3 — bound-fairness audit (task 3.5)
 
+> **Record status (banner added 2026-09-01):** script-generated snapshot of the G3-era audit,
+> 2026-08-21 (adopted table `v3-ro`, Phase-B 85M). Superseded by the same script's re-runs
+> `docs/phase4_fairness_audit.md` (adopted `v3-phase_c-ro`, 2026-08-22) and
+> `docs/phase6_fairness_audit.md` (2026-08-23, **the current audit**); the four ESCALATED
+> findings and the report-only policy are unchanged in both. Regenerating this file with
+> `scripts/fairness_audit.py` would drop this banner. **Current project position:
+> `docs/project_status.md`.**
+
 Generated 2026-08-21T22:57:50Z by `scripts/fairness_audit.py`; adopted table **v3-ro** (`CALIBRATION_VERSION`). Offsets are `NELBO − NLL_AR` in bits/char on the full tiled held-out split (positive = diffusion bound looser than the reference's likelihood).
 
 ## Offsets by calibration table (backbone × reference tier)

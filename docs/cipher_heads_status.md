@@ -1,5 +1,15 @@
 # Cipher-head early track (CH) — status
 
+> **Record status (banner added 2026-09-01):** cipher-heads early track, 2026-08-18/19 — the
+> heads prototyped against the **n-gram evaluator** while Phase A trained. Still current: the
+> code map, the `Evaluator` contract, the degenerate-optimum finding (CH.5) and the KL-defence
+> reversal (CH.8). **Every performance number and every "pending / in progress / NOT yet
+> fetched / deferred" heading below is superseded** by Phase 5 on the frozen diffusion
+> evaluator (G5 PASS 2026-08-23, `docs/phase5_status.md` §5.2–5.6) and Phase 6 on the
+> manuscript (2026-08-24, `docs/phase6_status.md`) — inline notes mark each; the one item
+> still genuinely open is CH.7 `SmallARLMEvaluator`. `docs/project_status.md` §5.13–5.14.
+> **Current project position: `docs/project_status.md`.**
+
 Status record for the concurrent cipher-head track defined in
 [Prototyping and Testing the Cipher Heads During Backbone Training](../reference_docs/Prototyping%20and%20Testing%20the%20Cipher%20Heads%20During%20Backbone%20Training.md),
 running alongside Phase-A pretraining (task 1.4). Started 2026-08-18.
@@ -74,6 +84,10 @@ Trial-decipherment ranking with calibrated offsets on rung-1 synthetics
 conditions): **true language ranked first 6/6**. The framework's core
 premise (decipherment score ranks languages — the Dhavare precedent) holds
 under n-gram scoring at rung 1. Full grid + homophonic probe pending.
+*[Superseded: the full rung-1 grid ran in Phase 3 (750 instances, 98.4 % language /
+98.7 % family at ≥ 200 chars, `docs/phase3_status.md` §3.6) and on the diffusion
+evaluator in Phase 5 (99.4 %, `docs/phase5_status.md` §5.2); the homophonic probe is
+Phase 5 §5.3 (language 18/18 by MDL total, 2026-08-23).]*
 
 ## CH.2 — shared harness ✅ / CH.9 probe wired
 
@@ -85,6 +99,11 @@ and the CH.9 trial-decipherment language ranking through the calibration
 hook (same solver seed across language conditions).
 
 ## CH.3 — rung 1, 1:1 Sinkhorn head ✅ code, acceptance run pending
+
+*[Superseded: the acceptance run is `docs/phase3_status.md` §3.6 (750 instances, n-gram
+tier) and `docs/phase5_status.md` §5.2 on the frozen evaluator — SER 0.0016, language
+recovery 99.4 % at ≥ 200 chars (G5, 2026-08-23). The table below is the 5-trials/cell
+preliminary of 2026-08-18.]*
 
 `diff_voyn/heads/rung1_sinkhorn.py`. Gumbel–Sinkhorn gradient phase
 (trigram soft score) → Hungarian projection → exhaustive 2-swap hill-climb +
@@ -101,6 +120,12 @@ frequency-rank-init restart. Preliminary (5 trials/cell, restarts=3):
 ~10–16 s/solve single-threaded.
 
 ## CH.5 — rung 2, unigram homophonic head — in progress
+
+*[Superseded: rung 2 was completed on the frozen diffusion evaluator in Phase 5 —
+`docs/phase5_status.md` §5.3: Zodiac-408-class 17/18 instances ≤ 1.9 % SER, median 0,
+language 18/18 by MDL total (G5, 2026-08-23); the degenerate-optimum finding below
+carried over and became the rule that every cell is ranked on the MDL total, never the
+pure ELBO. The baseline table below is the pre-diffusion n-gram result of 2026-08-18/19.]*
 
 `diff_voyn/heads/rung2_homophonic.py`. Gradient phase (soft assignment +
 row-entropy annealing + letter-frequency KL) feeding a pentagram SA over
@@ -137,11 +162,19 @@ true basin), larger restart budgets for the hit-rate tail, >=6-gram scoring.
 This is the honest n-gram baseline the plan asks for; closing the residual
 is part of what the diffusion evaluator is later asked to do (and the real
 anchors still need their transcriptions fetched).
+*[Superseded 2026-08-23: `docs/phase5_status.md` §5.3 — 17/18 ≤ 1.9 % SER, the Latin
+basin-hit problem closed by the two-tier protocol and the discrete ELBO polish.]*
 
-Literature anchors (Zodiac-408 / Borg / BnF fr2988 transcriptions) are NOT
-yet fetched — external data acquisition is an open task (extend
-`scripts/fetch_external.py`; anchor results reported as the pre-diffusion
-n-gram baseline per the plan).
+Literature anchors were fetched and run in Phase 6 (2026-08-24,
+`docs/phase6_status.md` §6.6): **Zodiac-408 PASS** (SER 0.0098, n-gram tier only —
+English is outside the inventory); **Borg** run, ranked Latin (0.250 bits/symbol) but
+SER 0.129 n-gram / 0.226 final against the ≤ 0.041 target — **FAIL, not like-for-like**
+(corrected/expanded published plaintext; glyph types with < 20 occurrences dropped);
+**BnF fr2988 still unobtainable** (DECODE login required). *(Corrected 2026-09-01;
+originally read "Literature anchors (Zodiac-408 / Borg / BnF fr2988 transcriptions) are
+NOT yet fetched — external data acquisition is an open task (extend
+`scripts/fetch_external.py`; anchor results reported as the pre-diffusion n-gram
+baseline per the plan)." `docs/project_status.md` §5.14.)*
 
 ## CH.6 — rung 3, Naibbe head — block-Sinkhorn head at threshold ✅(prelim)
 
@@ -180,6 +213,10 @@ order: within-block discrete swap polish (found scores still trail truth
 slightly, e.g. -40010 vs -39889 — the residual is search, not objective),
 larger restart/step budgets, VMS-scale DP vectorization. Restart budget so
 far: 2-3 restarts of 250-350 chunked-SGD steps each.
+*[Superseded 2026-08-23: `docs/phase5_status.md` §5.4 — Naibbe occurrence-weighted
+letter-map accuracy **0.998**, language 12/12 on the frozen evaluator (G5). VMS-scale DP
+vectorization was sidestepped by windowing in Phase 6; the within-block ELBO swap polish
+is untested since 2026-08-23 (`docs/project_status.md` §6).]*
 
 ## CH.8 — rung 4, arithmetic sum-to-target head ✅ acceptance met (2026-08-19)
 
@@ -205,6 +242,11 @@ design note the plan asks for). Highlights:
   the objective ordering; with it off the truth outscores every found key
   and polish-from-truth stays exactly at the truth. The assignment's
   injectivity is the structural defense; `freq_penalty_weight` defaults 0.
+  *[Forward pointer: this CH.5-vs-CH.8 tension — a frequency-shaped penalty that
+  rescues one head's search and corrupts another's truth — recurred on the diffusion
+  tier as the homophonic **choice-bits term**: kept for MDL ranking of cells, never
+  inside a polish (it degraded Borg; `docs/race_polish_plan.md` §7, 2026-08-25;
+  `docs/project_status.md` §5.4).]*
 - **Acceptance 5.5 (language recovery better than family-random): met.**
   Probe (2 instances/language × 3 conditions, common seed, calibrated
   bits/char): language top-1 **4/6**, family top-1 **5/6** (random: 2/6 and
@@ -212,15 +254,30 @@ design note the plan asks for). Highlights:
   complete key from scratch (u map acc 1.000, SER 0.003). Best config
   (head defaults): 400 Sinkhorn steps, 768-char chunks, 2 restarts,
   ~15–25 min/solve single-threaded. `data/cipher_heads/rung4_probe.json`.
+  *[Superseded 2026-08-23: `docs/phase5_status.md` §5.5 on the frozen evaluator —
+  language top-1 **7/9**, family **8/9** (G5). Superseded operationally 2026-08-24: on the
+  manuscript the arithmetic head **cannot run its validated way** — no admissible
+  canonical glyph order exists on the Boxer stream (every LOP optimum forces length-1
+  tokens), so `ArithmeticHead.solve_segmented` runs the lattice on observed word
+  boundaries instead (`docs/phase6_status.md`; `docs/project_status.md` §1).]*
 
-## Deliberately deferred
+## Deliberately deferred (as of 2026-08-19; status per item annotated 2026-09-01)
 
 - `SmallARLMEvaluator` (CH.7), anchor-data fetch, DP vectorization for
   VMS-scale (38k tokens ≈ 160k chars) rung-3/4 runs.
+  *[CH.7 `SmallARLMEvaluator` — **still open as of 2026-09-01**, no code exists (the
+  one genuinely open item in this file; `docs/project_status.md` §6). Anchor-data fetch —
+  done in Phase 6 (Zodiac-408, Borg; BnF fr2988 unavailable), see CH.5 above. DP
+  vectorization — sidestepped by windowing in Phase 6, never built.]*
 - Full-grid acceptance runs (50 ciphers/cell) — current numbers are 2–5
   trials/cell smoke levels.
+  *[Done: Phase 3 §3.6 (750 rung-1 instances, 2026-08-21) and Phase 5 §5.2–5.5 on the
+  frozen evaluator (G5, 2026-08-23).]*
 - Rung-4 next levers (design note §6): more restarts for the 0.02-bit
   near-misses, exact-EM interleave on the assignment, pair-swap polish.
+  *[Rung-4 acceptance passed in Phase 5 §5.5 (7/9 language, 8/9 family) without these;
+  the rung-4 `elbo_polish`-over-`u` idea is untested since 2026-08-23
+  (`docs/project_status.md` §6).]*
 
 ## Side study — robustness of the n-gram judges vs the diffusion judges (2026-08-22)
 

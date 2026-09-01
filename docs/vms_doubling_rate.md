@@ -1,5 +1,8 @@
 # VMS token doubling rate — verification, scribal-hand breakdown, and what it says about Boxer's cipher
 
+> **Record status (banner added 2026-09-01):** side study, 2026-08-20, extended to 2026-08-26 (§5b/5c added 2026-08-21, §8–8.7 word-terminal doubling added 2026-08-26); complete.
+> Still current: all measurements (Boxer 9.29/1000, per-hand n.s., geminate collapse, Naibbe under-doubling, German word-final 49/1000 vs Latin 3.4), which feed the word-homophonic unit definition (`docs/wordhom_study.md` §2.1). Superseded: §8.7's "word = letter premise untestable at 3–5 tokens per type" — testable and negative at Currier B's 4.6 with the 2026-08-28 solver, untestable only at Currier A's 3.0 (`docs/project_status.md` §3); §7 open items unchanged. **Current project position: `docs/project_status.md`.**
+
 **Date:** 2026-08-20 · **Status:** side-quest, complete · **Not on the Phase 0–6 critical path**, but it constrains rung 4 (CH.8) and Phase 6 VMS scoring.
 
 **Artifacts**
@@ -418,6 +421,8 @@ inference rests entirely on Boxer's word = letter premise, which the Phase-6
 and word-homophonic studies (`docs/wordhom_study.md`) found untestable at the
 manuscript's 3–5 tokens per type; it is a consistency check, not evidence
 for the model.
+
+*[Qualified 2026-09-01: written 2026-08-26, before the wildcard → anneal solver. The premise is untestable at Currier A's 3.0 tokens per type (below the ≈ 4 findability wall) but testable — and negative, 24/24 NOISE — at Currier B's 4.6 (`docs/alt_loop_plan.md` §8.6, §10; `docs/altloop_vms_plan.md` §13; `docs/project_status.md` §3).]*
 
 **Recommendation for the review**: report §8.1 (rate + mode diversity, word-
 final vs word-initial), the paragraph-terminal count with its denominator
