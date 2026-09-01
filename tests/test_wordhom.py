@@ -4,6 +4,8 @@ bookkeeping, the synthetic cipher, and the apply-pipeline plumbing."""
 
 from __future__ import annotations
 
+import itertools
+
 import numpy as np
 import pytest
 
@@ -183,3 +185,90 @@ def test_polish_and_sa_use_incremental_state_and_return_full_score():
     m2, sc2, _ = hd.sa_phase(symbols, adj, key.copy(), "toy", t, rng, steps=2000)
     assert sc2 == pytest.approx(hd.objective(m2, symbols, adj, "toy", t), abs=1e-6)
     assert sc2 >= hd.objective(key, symbols, adj, "toy", t)
+
+
+# -- unit-set specs (doubles + general bigrams, 2026-08-30) -------------------
+
+
+def test_parse_units_and_suffix():
+    from diff_voyn.heads.wordhom import parse_units, units_suffix
+
+    assert parse_units(None) == (5, 0)
+    assert parse_units("d5") == (5, 0)
+    assert parse_units("d5b20") == (5, 20)
+    assert parse_units("d3b7") == (3, 7)
+    assert units_suffix(None) == "" and units_suffix("d5") == ""
+    assert units_suffix("d5b20") == "_d5b20"
+    with pytest.raises(ValueError):
+        parse_units("b20")
+
+
+def test_language_targets_general_bigrams_extend_the_doubles():
+    from diff_voyn.heads.wordhom import language_targets
+
+    ev = _toy_evaluator()
+    d5 = language_targets(ev, "toy")
+    big = language_targets(ev, "toy", units="d5b20")
+    assert len(d5.bigrams) == 5 and len(big.bigrams) == 25
+    # doubles first, unchanged, so a d5 key is a d5b20 key
+    assert big.bigrams[:5] == d5.bigrams
+    gen = big.bigrams[5:]
+    assert all(a != b for a, b in gen)
+    assert len(set(gen)) == 20
+    # ranked by the LM's bigram probability
+    l1 = ev.logT("toy", 1).cpu().numpy().reshape(A)
+    l2 = ev.logT("toy", 2).cpu().numpy().reshape(A, A)
+    j = [l1[a] + l2[a, b] for a, b in gen]
+    assert all(x >= y - 1e-9 for x, y in itertools.pairwise(j))
+    # the numeric form agrees with the spec form
+    assert language_targets(ev, "toy", 5, 20).bigrams == big.bigrams
+
+
+def test_project_key_between_unit_spaces():
+    from diff_voyn.heads.wordhom import project_key
+
+    cipher = UnitTargets(((0, 0), (3, 3), (1, 2)))
+    hyp = UnitTargets(((0, 0), (3, 3), (1, 2), (4, 5)))  # superset, same order
+    tm = np.array([0, 7, A, A + 1, A + 2])
+    assert (project_key(tm, cipher, hyp) == tm).all()
+    # subset: the missing unit falls back to its first letter
+    sub = UnitTargets(((0, 0),))
+    assert project_key(tm, cipher, sub).tolist() == [0, 7, A, 3, 1]
+    # reordered: units follow their pair, not their index
+    re_ = UnitTargets(((1, 2), (0, 0)))
+    assert project_key(tm, cipher, re_).tolist() == [0, 7, A + 1, 3, A]
+    # identical spaces: identity object semantics not required, values equal
+    assert (project_key(tm, cipher, cipher) == tm).all()
+
+
+def test_round_trip_and_incremental_state_with_general_bigrams():
+    from diff_voyn.heads.wordhom import WordHomophonicHead
+    from diff_voyn.heads.wordhom_state import WordHomObjectiveState
+
+    t = UnitTargets(((0, 0), (3, 3), (0, 1), (2, 5), (5, 2)))
+    rng = np.random.default_rng(1)
+    plain = rng.integers(0, 7, size=800)
+    units = segment_units(plain, t)
+    assert (expand_units(units, t) == plain).all()
+    assert (units >= A + 2).sum() > 0  # general bigram units were formed
+    ev = _toy_evaluator()
+    hd = WordHomophonicHead(ev, targets=t, seed=0)
+    n_sym, n_tok = 80, 900
+    w = 1.0 / np.arange(1, n_sym + 1)
+    symbols = rng.choice(n_sym, size=n_tok, p=w / w.sum())
+    adj = adjacency(symbols, None)
+    key = rng.integers(0, t.n, size=n_sym)
+    st = WordHomObjectiveState(hd, symbols, adj, key, "toy", t)
+    full = lambda m: hd.objective(m, symbols, adj, "toy", t)
+    assert st.score == pytest.approx(full(key), abs=1e-3)
+    for _ in range(150):
+        syms, us = rng.choice(n_sym, size=1), rng.integers(t.n, size=1)
+        d = st.delta(syms, us)
+        m2 = st.sym_map.copy()
+        m2[syms] = us
+        assert d == pytest.approx(full(m2) - full(st.sym_map), abs=2e-3)
+        if rng.random() < 0.5:
+            st.commit(syms, us)
+    # the synthetic cipher over the wide unit set inverts under its own key
+    _, toks, s2u = WordHomCipher(t, n_types=200).encipher(plain, rng)
+    assert (expand_units(s2u[toks], t) == plain).all()

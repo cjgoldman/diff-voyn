@@ -52,6 +52,7 @@ under polish from the true key, 0.6% of the top-400 occurrence-weighted).
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -61,6 +62,25 @@ from .evaluator import TokenEmission
 from .ngram import A
 
 N_BIGRAMS = 5
+# unit-set spec strings: ``d<k>`` = the language's top-k doubled letters
+# (Boxer's hypothesis as clarified, the default), ``d<k>b<m>`` = those plus
+# the top-m NON-doubled bigrams as further single-character units (the
+# 2026-08-30 "doubles + bigrams" variant; see ``language_targets``)
+UNITS_DEFAULT = "d5"
+_UNITS_RE = re.compile(r"^d(\d+)(?:b(\d+))?$")
+
+
+def parse_units(spec: str | None) -> tuple[int, int]:
+    """``"d5"`` → (5, 0); ``"d5b20"`` → (5, 20)."""
+    m = _UNITS_RE.match(spec or UNITS_DEFAULT)
+    if m is None:
+        raise ValueError(f"bad unit-set spec {spec!r} (want d<k> or d<k>b<m>)")
+    return int(m.group(1)), int(m.group(2) or 0)
+
+
+def units_suffix(spec: str | None) -> str:
+    """File-name suffix of a unit-set spec: '' for the default, else '_<spec>'."""
+    return "" if (spec or UNITS_DEFAULT) == UNITS_DEFAULT else f"_{spec}"
 
 
 # -- target alphabet ---------------------------------------------------------
@@ -97,27 +117,86 @@ class UnitTargets:
 
 
 def language_targets(
-    evaluator, language: str, n_bigrams: int = N_BIGRAMS
+    evaluator,
+    language: str,
+    n_bigrams: int = N_BIGRAMS,
+    n_general: int = 0,
+    *,
+    units: str | None = None,
 ) -> UnitTargets:
     """The language's ``n_bigrams`` most frequent DOUBLED letters (aa) under
     the frozen n-gram LM, p(aa) = p1(a) p2(a|a) — the ß-like extra
-    characters of the hypothesis. (General bigrams were tried first and
-    rejected by the doubling control: with er/en/… as units the text's
-    doubled-unit rate stays at 35–44 per 1000 against the manuscript's
-    7–9; with the top-5 doubled letters it is 10–16.)"""
+    characters of the hypothesis — followed by its ``n_general`` most
+    frequent NON-doubled bigrams (a≠b) when asked for (``units="d5b20"``;
+    ``units`` overrides both counts). Doubles come first so a key in the
+    ``d<k>`` space is a key in the ``d<k>b<m>`` space unchanged.
+
+    (General bigrams were tried first as *the* hypothesis and rejected by
+    the doubling control: with er/en/… as units the text's doubled-unit
+    rate stays at 35–44 per 1000 against the manuscript's 7–9; with the
+    top-5 doubled letters it is 10–16. The ``b<m>`` variant is a decoder
+    over-specification study, not a claim about the manuscript.)"""
+    if units is not None:
+        n_bigrams, n_general = parse_units(units)
     l1 = evaluator.logT(language, 1).cpu().numpy().reshape(A)
     l2 = evaluator.logT(language, 2).cpu().numpy().reshape(A, A)
-    joint = l1 + np.diagonal(l2)
-    top = np.argsort(-joint)[:n_bigrams]
-    return UnitTargets(tuple((int(a), int(a)) for a in top))
+    joint = l1[:, None] + l2
+    top = np.argsort(-np.diagonal(joint))[:n_bigrams]
+    pairs = [(int(a), int(a)) for a in top]
+    if n_general > 0:
+        off = joint.copy()
+        np.fill_diagonal(off, -np.inf)
+        order = np.argsort(-off, axis=None)[:n_general]
+        pairs += [(int(i // A), int(i % A)) for i in order]
+    return UnitTargets(tuple(pairs))
 
 
-def targets_from_ids(ids: np.ndarray, n_bigrams: int = N_BIGRAMS) -> UnitTargets:
-    """Top doubled letters of a letter stream (out-of-inventory generators)."""
+def hypothesis_targets(
+    evaluator, language: str, *, units: str | None = None, inst: dict | None = None
+) -> UnitTargets:
+    """The unit space a DECODER runs in for ``language``: an instance's
+    ``truth.hyp_bigrams`` override when present (battery cells whose
+    hypothesis deliberately differs from the cipher, e.g. ``revdouble``),
+    else ``language_targets`` under the ``units`` spec."""
+    hb = (inst or {}).get("truth", {}).get("hyp_bigrams")
+    if hb is not None:
+        return UnitTargets.from_list(hb)
+    return language_targets(evaluator, language, units=units)
+
+
+def project_key(
+    true_map: np.ndarray, cipher_targets: UnitTargets, hyp_targets: UnitTargets
+) -> np.ndarray:
+    """The cipher's true key expressed in the hypothesis' unit space: letters
+    stay, a bigram unit the hypothesis also has takes its index there, a
+    bigram unit the hypothesis lacks falls back to its first letter (the
+    closest representable key — one wrong letter per occurrence, measured as
+    such by the letter-level SER). Identity when the spaces coincide."""
+    true_map = np.asarray(true_map, dtype=np.int64)
+    if cipher_targets.bigrams == hyp_targets.bigrams:
+        return true_map
+    idx = {pair: A + i for i, pair in enumerate(hyp_targets.bigrams)}
+    lut = np.arange(cipher_targets.n, dtype=np.int64)
+    for i, pair in enumerate(cipher_targets.bigrams):
+        lut[A + i] = idx.get(pair, pair[0])
+    return lut[true_map]
+
+
+def targets_from_ids(
+    ids: np.ndarray, n_bigrams: int = N_BIGRAMS, n_general: int = 0
+) -> UnitTargets:
+    """Top doubled letters (then top non-doubled bigrams) of a letter stream
+    (out-of-inventory generators)."""
     ids = np.asarray(ids, dtype=np.int64)
     c = np.bincount(ids[:-1] * A + ids[1:], minlength=A * A).reshape(A, A)
     top = np.argsort(-np.diagonal(c))[:n_bigrams]
-    return UnitTargets(tuple((int(a), int(a)) for a in top))
+    pairs = [(int(a), int(a)) for a in top]
+    if n_general > 0:
+        off = c.astype(float)
+        np.fill_diagonal(off, -1.0)
+        order = np.argsort(-off, axis=None)[:n_general]
+        pairs += [(int(i // A), int(i % A)) for i in order]
+    return UnitTargets(tuple(pairs))
 
 
 # -- unit streams ------------------------------------------------------------
@@ -231,6 +310,7 @@ class WordHomophonicHead:
         *,
         targets: UnitTargets | None = None,
         n_bigrams: int = N_BIGRAMS,
+        units: str | None = None,
         rescore_order: int = 5,
         freq_penalty_weight: float = 1.0,
         repeat_weight: float = 4.0,
@@ -239,6 +319,8 @@ class WordHomophonicHead:
         self.ev = evaluator
         self.targets = targets
         self.n_bigrams = n_bigrams
+        # unit-set spec (``parse_units``); overrides ``n_bigrams`` when given
+        self.units = units
         self.rescore_order = rescore_order
         self.freq_penalty_weight = freq_penalty_weight
         self.repeat_weight = repeat_weight
@@ -250,7 +332,11 @@ class WordHomophonicHead:
         self.wild_types: np.ndarray | None = None
 
     def targets_for(self, language: str) -> UnitTargets:
-        return self.targets or language_targets(self.ev, language, self.n_bigrams)
+        if self.targets is not None:
+            return self.targets
+        if self.units is not None:
+            return language_targets(self.ev, language, units=self.units)
+        return language_targets(self.ev, language, self.n_bigrams)
 
     def _log_prior(self, language: str) -> np.ndarray:
         if language not in self._prior:

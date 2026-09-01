@@ -128,8 +128,14 @@ class Cell:
             self.symbols = np.asarray(inst["symbols"][a:b], dtype=np.int64)
             pos = np.asarray(inst["token_pos"][a:b], dtype=np.int64)
             self.adj = adjacency(self.symbols, pos)
-            self.hd = WordHomophonicHead(ng, seed=self.seed)
+            # unit set: d5 (Phase-6 hypothesis) or --units d5b20 (doubles +
+            # top-20 bigrams variant, 2026-08-30); the start key must come
+            # from a solve in the same space (vms_solves<_units>.json)
+            self.units = getattr(args, "units", None)
+            self.hd = WordHomophonicHead(ng, seed=self.seed, units=self.units)
             self.targets = self.hd.targets_for(self.lang)
+            assert len(rec["candidates"][0]["bigrams"]) == len(self.targets.bigrams), (
+                self.name, "solve/hypothesis unit-set mismatch")
             self.n_cipher_window = int(sum(len(t) for t in inst["all_tokens"][a:b]))
             self.key_len = self.n_sym
             # hapax-as-wildcard objective (docs/alt_loop_plan.md §8.4/8.6):
@@ -347,8 +353,11 @@ def build_cells(head, ng, ev, args, offs):
     root = data_root()
     cells = []
     if head == "wordhom":
+        from diff_voyn.heads.wordhom import units_suffix
+
         wd = root / "analysis/wordhom"
-        solves = json.loads((wd / "vms_solves.json").read_text())["instances"]
+        suf = units_suffix(getattr(args, "units", None))
+        solves = json.loads((wd / f"vms_solves{suf}.json").read_text())["instances"]
         meta = json.loads((root / "analysis/phase6/vms_report.json").read_text())[
             "instances"
         ]
@@ -406,6 +415,8 @@ def build_cells(head, ng, ev, args, offs):
                 )
     if args.only:
         cells = [c for c in cells if any(o in c.name for o in args.only)]
+    if getattr(args, "langs", None):
+        cells = [c for c in cells if c.lang in args.langs]
     return cells
 
 
@@ -702,6 +713,7 @@ def run_one(args, c, arm, seed, res, rep, log, tier_counts, promising, prom_path
         "cell": c.name,
         "head": args.head,
         "tag": args.tag,
+        "units": getattr(c, "units", None),
         "start_from": args.start_from,
         "wild": bool(args.wild),
         "hapax_max": int(args.hapax_max),
@@ -991,6 +1003,18 @@ def main():
         "--start-from",
         default=None,
         help="tag of a runs file whose final_key seeds each (cell, arm, seed)",
+    )
+    p.add_argument(
+        "--units",
+        default=None,
+        help="wordhom unit-set spec (d5 default; d5b20 = doubles + top-20 bigrams) — "
+        "starts come from analysis/wordhom/vms_solves<_units>.json",
+    )
+    p.add_argument(
+        "--langs",
+        nargs="*",
+        default=None,
+        help="restrict wordhom cells to these hypothesis languages",
     )
     p.add_argument("--seeds", type=int, default=2)
     p.add_argument("--rounds", type=int, default=6)

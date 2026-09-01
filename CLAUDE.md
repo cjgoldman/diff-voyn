@@ -18,6 +18,14 @@ The design is fully specified in `reference_docs/` — read those before impleme
 - `Design and Training of the Multilingual Diffusion Backbone.md` — the authoritative design doc: every architecture/training decision with alternatives and reasoning (referenced below as "design §N").
 - `Diffusion Model Training - Task Breakdown.md` — the execution plan: Phases 0–6 with hard gates G0–G5, task IDs (e.g. 0.1, 5.4), priorities, and acceptance criteria. New work should map to a task ID from this plan.
 
+## Polygraphia / Trithemius quarantine (2026-08-31)
+
+The Polygraphia "Ave Maria" digitization (`docs/polygraphia_status.md`) is **instrumentation only and is quarantined from every control-set workflow**: never add Polygraphia/Trithemius instances to a control battery, a wordhom/Phase-6 control manifest, an abstention-threshold calibration set, or any aggregate "controls" statistic. Reason: the provisional 41-column cyclic cells produced the pipeline's first false CALLS (periodic pseudo-language objective trap, margins 1.76–1.96 at SER 0.74–0.77), the cipher is not representable in the wordhom key space (word→letter collisions grow with table size: 73/889 words at 41 cols, 275/1746 at 92), and the transcription is unvalidated single-key for most columns. The findings stand as recorded (status doc + `DATA_ROOT/analysis/polygraphia_anchor/`); the anchor may be revisited only as its own explicitly-named study, and joining any control set would require the user's say-so.
+
+## Solver selection convention
+
+When the user asks to run "the wordhom solver" (or a solve of word-homophonic cells generally), they mean the **most advanced solving pipeline currently available** — as of 2026-08-31 that is the hapax-wildcard objective with wildcard→anneal re-admission and the post-all loop (`docs/wildcard-anneal` / `scripts/altloop_vms.py --wild --wild-anneal`), not plain multi-restart SA (`WordHomophonicHead.solve`). Plain SA is a baseline/control, to be run only when the user asks for a simpler version explicitly or when a study's design needs it as a comparison arm. If it is unclear which solver applies, or the most powerful one seems inappropriate for the task (e.g. wrong instance shape, prohibitive cost, a frozen-protocol replication), ask the user instead of silently downgrading.
+
 ## Environment and commands
 
 Development happens inside a devcontainer (CPU or GPU variant, selected via `.devcontainer/cpu/` or `.devcontainer/gpu/`; the GPU one uses a PyTorch CUDA base image and `runtime: nvidia`). Dependencies are managed with **uv** (Python 3.12, venv at `/workspace/.venv`):

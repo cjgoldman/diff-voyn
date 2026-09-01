@@ -170,6 +170,7 @@ def all_jobs(args, paths):
             n_windows=args.n_windows,
             w5=args.w5,
             restarts={WORDHOM: args.restarts},
+            units=args.units,
         )
         for j in js:
             j["sa_steps"] = args.sa_steps
@@ -182,12 +183,14 @@ def _paths(args):
 
 
 def stage_solve(args):
+    from diff_voyn.heads.wordhom import units_suffix
+
     settings = {
-        k: getattr(args, k) for k in ("w5", "restarts", "sa_steps", "n_windows")
+        k: getattr(args, k) for k in ("w5", "restarts", "sa_steps", "n_windows", "units")
     }
     run_solves(
         all_jobs(args, _paths(args)),
-        args.out_dir / f"{args.set}_solves.json",
+        args.out_dir / f"{args.set}_solves{units_suffix(args.units)}.json",
         workers=args.workers,
         settings=settings,
         fresh=args.fresh,
@@ -508,6 +511,12 @@ def main():
     p.add_argument("--n-windows", type=int, default=1)
     p.add_argument("--restarts", type=int, default=8)
     p.add_argument("--sa-steps", type=int, default=400_000)
+    p.add_argument(
+        "--units",
+        default=None,
+        help="wordhom unit-set spec for the solve stage (d5 default; d5b20 = doubles + "
+        "top-20 bigrams, written to <set>_solves_d5b20.json)",
+    )
     p.add_argument(
         "--ckpt", type=Path, default=root / "runs/phase_c-85m-seed0/ckpt_final.pt"
     )

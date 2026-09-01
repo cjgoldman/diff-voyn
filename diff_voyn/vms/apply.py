@@ -80,10 +80,12 @@ _PARSER = None
 # -- jobs --------------------------------------------------------------------
 
 
-def head_key_bits(head: str, n_sym: int) -> float:
+def head_key_bits(head: str, n_sym: int, n_units: int | None = None) -> float:
     """Description length of the key class actually searched: an injective
     map of ``n_sym`` symbols into the 25 letters for rung 1 (log2 25!/(25−n)!),
-    the Phase-5 terms otherwise."""
+    the Phase-5 terms otherwise. For WORDHOM under a non-default unit spec,
+    pass ``n_units`` (= targets.n) so the key cost grows with the unit space
+    (the recorded d5/d5b20 runs used the default 30-unit constant)."""
     if head == "sub1to1":
         return log2_factorial(A) - log2_factorial(max(A - n_sym, 0))
     if head == "homophonic":
@@ -95,7 +97,7 @@ def head_key_bits(head: str, n_sym: int) -> float:
     if head == WORDHOM:
         from ..heads.wordhom import N_BIGRAMS
 
-        return n_sym * math.log2(A + N_BIGRAMS)
+        return n_sym * math.log2(n_units if n_units is not None else A + N_BIGRAMS)
     raise ValueError(head)
 
 

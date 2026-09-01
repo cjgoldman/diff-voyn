@@ -118,7 +118,7 @@ def score_map(ev, table, inst, meta, m, targets, hyp, *, budget, seeds, score_wi
     n_plain = len(letters)
     params = _wordhom_choice_params(inst, m, targets, 0, len(sym))
     cb = _choice_total(WORDHOM, letters, params)
-    kb = head_key_bits(WORDHOM, int(inst["n_symbols"]))
+    kb = head_key_bits(WORDHOM, int(inst["n_symbols"]), n_units=targets.n)
     W = ev.window
     cuts = [(s, s + W) for s in range(0, max(n_plain - W + 1, 1), W)] or [(0, n_plain)]
     if len(cuts) > score_windows:
