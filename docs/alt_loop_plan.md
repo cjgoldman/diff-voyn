@@ -887,7 +887,8 @@ A-like positives (anneal finals of §8.6, seeds 0–2; from `analysis/altloop/ju
   where patience triggers first — is binding on these cells (62/80 and
   53/80 rounds accepted at the end; the mixed-Latin continuation converged
   at 0.17 with 56 more rounds). The single dirty-German seed-0 call (0.148,
-  margin 1.51) did not replicate (seed 1: 0.251, 1.13).
+  margin 1.51) did not replicate (seed 1: 0.251, 1.13). *[Superseded 2026-09-03 at
+  B shape: called on both seeds, 0.085 / 1.69–1.70 — §10.6, `docs/project_status.md` §5.18.]*
 - **A 20 % foreign block does not lower the ceiling but flips the
   ranking**: the German host is called with the Latin block decoded at
   0.071; the Latin and Italian hosts' true keys are language-like
@@ -952,7 +953,94 @@ not run.
    transcription noise is a decipherment the frozen rule cannot call.
 3. Seeds: negatives are one seed each; the positive/negative gap is large
    enough that this is fine for the negatives, not for borderline positives.
+   *[2026-09-03: the dirty-5 % German cell was re-run at B shape with two
+   seeds and called on both — §10.6.]*
 4. Run `revdouble` for Latin/Italian (built, unsolved) if the doubled-unit
    hypothesis is to be argued for the Romance languages.
 5. Latin held-out set: the pharmacopoeia document should be excluded (or
    down-weighted) at the next corpus version.
+
+### 10.6 Dirty positives at B shape (2026-09-02 → 03)
+
+*Why:* the evidence-odds table (`docs/bayesian_perspective_review.md` §5)
+had no dirty pile at B shape, and B is the dialect inside the solver's
+regime. Six instances `dirty/<lang>/Blike_{s05,s10}` were built with
+`scripts/wordhom_battery.py --stage prepare --controls dirty --shapes Blike`
+(30 000 letters / 7 200 types, 5.5–5.7 tokens/type; the A-like RNG
+derivation is unchanged so no recorded instance was re-drawn), solved for
+their n-gram start keys (≈ 35 s each), and run through the chain of record
+(`analysis/altloop/battery/chain_bd{0,1}.sh`: wild 96 / patience 10 →
+anneal 0,40 / 80 / patience 10 → `judge_at_ser.py --battery`), two seeds on
+the s05 cells. Tags `_bat_{wild,anneal}_bd{0,1}`, judge `_battery_bd{0,1}`;
+report `analysis/wordhom/battery/report_bshape_dirty.md`. A pre-read scored
+the truth and stuck keys first (13 min per GPU), which is what surfaced the
+Latin text problem below before any solver time was spent. Wall clock
+15:42 → 03:38 UTC on two GPUs; a B-shape seed-run is ≈ 2 h (wild 20–60 min,
+anneal 70–106 min, ≈ 2 min per judged key).
+
+**Truth ceilings (judge margin of the true key), B shape vs A shape:**
+
+| cell | clean text bpc | truth margin B | truth margin A | callable at truth |
+|---|---|---|---|---|
+| german s05 | 2.27 | 1.98 | 1.95 | yes |
+| german s10 | 2.56 | 1.52 | 1.54 | barely |
+| latin s05 | **3.00** | 1.24 | 1.56 | **no — hard text** |
+| latin s10 | 2.58 | 1.23 | 1.06 | no |
+| italian s05 | 2.83 | 1.26 | 1.22 | no |
+| italian s10 | 2.88 | 0.93 | 0.91 | no |
+
+Shape does not move the ceiling. The Latin s05 window passed the sampler's
+3.6-bpc cap but sits at 3.00 (its A-shape twin is 2.56, the clean B
+positive 2.16), so that cell was uncallable before any search ran — the
+pharmacopoeia lesson of 2026-08-30 again (check the plaintext bpc first).
+A Latin dirty-5 % power statement at B shape needs a re-drawn instance
+with an ordinary text; not done.
+
+**Solver results (anneal finals; judge = frozen `ABSTAIN_RULE`):**
+
+| cell | seed | wild SER | anneal SER | plain | margin | called |
+|---|---|---|---|---|---|---|
+| dirty/german/Blike_s05 | 0 | 0.756 → 0.557 | 0.086 | 2.52 | **1.69** | **yes** |
+| dirty/german/Blike_s05 | 1 | 0.756 → 0.505 | 0.085 | 2.51 | **1.70** | **yes** |
+| dirty/german/Blike_s10 | 0 | 0.793 → 0.689 | 0.606 | 3.48 | 0.34 (top Latin) | no |
+| dirty/latin/Blike_s05 | 0 | 0.790 → 0.743 | 0.538 | 3.37 | 0.40 | no |
+| dirty/latin/Blike_s05 | 1 | 0.790 → 0.711 | 0.554 | 3.37 | 0.39 | no |
+| dirty/latin/Blike_s10 | 0 | 0.790 → 0.773 | 0.560 | 3.41 | 0.35 (top German) | no |
+| dirty/italian/Blike_s05 | 0 | 0.788 → 0.275 | 0.220 | 3.17 | 0.87 | no |
+| dirty/italian/Blike_s05 | 1 | 0.788 → 0.263 | 0.230 | 3.18 | 0.85 | no |
+| dirty/italian/Blike_s10 | 0 | 0.798 → 0.780 | 0.775 | 3.49 | 0.28 (top Latin) | no |
+
+**Readings.**
+
+1. **The dirty-5 % German call replicates at B shape**: both seeds reach
+   SER 0.085–0.086 and margins 1.69–1.70 against a 1.98 ceiling. At A
+   shape the same cell went 0.148 / 1.51 (called) and 0.25 / 1.13 (not
+   called). The extra tokens per type (5.5 vs 4.2) are what the anneal
+   needed; the wild stage still stalls at 0.5–0.56 on dirty text and the
+   anneal does the rest in 71–79 min.
+2. **Dirty 10 % stays unsolved and uncalled in every language** (finals
+   0.28–0.35, inside the manuscript's own band 0.30–0.51, with the top
+   language flipping to a wrong one). German's 1.52 ceiling leaves no
+   headroom; Latin/Italian are uncallable at truth.
+3. **Italian dirty-5 % is a search success and a judge failure**: the
+   wild stage reaches 0.26–0.28 (A shape: 0.59), the anneal 0.22–0.23,
+   margins 0.85–0.87 — but the ceiling is 1.26, so nothing the search could
+   have done would produce a call. Latin dirty-5 % stalls at 0.54–0.55 on
+   its hard text.
+4. **Odds table after this run** (`analysis/evidence_odds/odds.md`,
+   regenerated 2026-09-03; the script pools A and B shapes per language):
+   German dirty-5 % pile n 4, 1.13–1.70, power 0.75 (was n 2, 0.50); LR of
+   the manuscript's B cells against a dirty-5 % German cipher **1/83 –
+   1/100** (was 1/29 – 1/34), A cells 1/27 – 1/58 (was 1/15 – 1/21).
+   German dirty-10 % pile n 2 (0.34, 0.44), power 0, LR 1/1.2 – 1/1.8 on B
+   (no evidence). Latin dirty-5 % pile n 4, 0.39–0.43, power 0, LR ≈ 1 on
+   B; Italian dirty-5 % n 3, 0.62–0.87, uncallable, LR 1/10 – 1/14 on B by
+   margin gap only.
+5. Verdict wording after this run: *B excludes the clean German/Latin
+   word-homophonic hypothesis and a 5 %-noisy German one at roughly
+   1 : 90; the 10 %-noisy, noisy-Latin and Italian variants are not
+   excluded; A keeps its earlier reading.*
+
+Carry forward: a re-drawn `dirty/latin/Blike_s05` on an ordinary text
+(the only way to get a Latin dirty-5 % B-shape power point); the
+`--shapes` flag now builds dirty positives for either shape.

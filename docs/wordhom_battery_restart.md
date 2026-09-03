@@ -59,7 +59,7 @@ their `controls_solves.json` starts. Latin/Italian instances exist but are NOT s
    `mixed/german+latin/Alike:german`, `positive/german/Blike:german`,
    `shuffled/german/Blike:german`. GPU 1: `positive/german/Alike:italian`,
    `voynichesque/german/Alike:german`, `dirty/german/Alike_s10:german`,
-   `voynichesque/german/Blike:german`. ≈ 40 min per A-like cell, ≈ 100 min per
+   `voynichesque/german/Blike:german`. ≈ 40 min per A-like cell, ≈ 100 min *[measured 2026-09-03: ≈ 2 h per seed-run]* per
    B-like; `CELL_DONE …` lines in `data/analysis/altloop/battery/run_g{0,1}.out`,
    judge lines in `judge_g{0,1}.out`.
 5. Report as cells finish:

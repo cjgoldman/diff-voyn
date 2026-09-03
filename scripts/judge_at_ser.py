@@ -116,7 +116,10 @@ def corrupt(true_map, occ, frac, rng, n_units, rare_first):
     return m
 
 
-def score_map(ev, table, inst, meta, m, targets, hyp, *, budget, seeds, score_windows, seed):
+def score_map(ev, table, inst, meta, m, targets, hyp, *, budget, seeds, score_windows, seed,
+              shuffle_seed=None):
+    """Phase-6 scoring of one key. ``shuffle_seed`` (default ``seed``) draws the
+    letter-shuffled reference; the CRN masks stay on ``seed``."""
     sym = np.asarray(inst["symbols"], dtype=np.int64)
     letters = expand_units(m[sym], targets)
     n_plain = len(letters)
@@ -127,7 +130,7 @@ def score_map(ev, table, inst, meta, m, targets, hyp, *, budget, seeds, score_wi
     cuts = [(s, s + W) for s in range(0, max(n_plain - W + 1, 1), W)] or [(0, n_plain)]
     if len(cuts) > score_windows:
         cuts = [cuts[i] for i in np.linspace(0, len(cuts) - 1, score_windows).astype(int)]
-    rng = np.random.default_rng(seed)
+    rng = np.random.default_rng(seed if shuffle_seed is None else shuffle_seed)
     wins = []
     for wi, (s, e) in enumerate(cuts):
         dec = letters[s:e]

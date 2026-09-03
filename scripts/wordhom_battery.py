@@ -11,7 +11,7 @@ Instances (all ``wordtypesall``, one per language and shape; ``Alike`` =
                                      statistics and the manuscript's shape
   voynichesque/<lang>/{Alike,Blike}  pinned voynichesque gibberish at the
                                      manuscript's token count — NEGATIVE
-  dirty/<lang>/Alike_s05, _s10       plaintext with i.i.d. transcription
+  dirty/<lang>/{Alike,Blike}_s05, _s10  plaintext with i.i.d. transcription
                                      errors (Phase-2 ``TranscriptionNoise``,
                                      5 % / 10 % per character) enciphered
                                      under the clean key — POSITIVE whose
@@ -307,30 +307,39 @@ def stage_prepare(args):
                 n_types=nt_big,
             )
             emit("bigram", inst)
-        # dirty positives (A-like)
-        ln, nt = SHAPES["Alike"]
-        for tag, sev in DIRTY_SEVERITIES.items() if "dirty" in controls else ():
-            rng = _rng("battery-dirty", args.seed, lang, tag)
-            clean = sample_long(smp, ln, rng, ev.lms[lang])
-            plain, info = dirty_plain(clean, sev, rng)
-            emit(
-                "dirty",
-                wordhom_instance(
-                    f"dirty/{lang}/Alike_{tag}",
-                    plain,
-                    targets,
-                    rng,
-                    dict(
-                        base,
-                        shape="Alike",
-                        dirty=tag,
-                        severity=sev,
-                        noise_info={k: v for k, v in info.items()},
-                        clean_ids=clean.tolist(),
+        # dirty positives: A-like (2026-08-29) and, since 2026-09-02, B-like
+        # (docs/bayesian_upgrade_resume.md §3.1 — the odds table had no dirty
+        # pile at B shape). The A-like RNG derivation is kept byte-identical
+        # so the recorded A-like instances are not re-drawn; B-like adds the
+        # shape to the seed.
+        for shape in args.shapes if "dirty" in controls else ():
+            ln, nt = SHAPES[shape]
+            for tag, sev in DIRTY_SEVERITIES.items():
+                rng = (
+                    _rng("battery-dirty", args.seed, lang, tag)
+                    if shape == "Alike"
+                    else _rng("battery-dirty", args.seed, lang, shape, tag)
+                )
+                clean = sample_long(smp, ln, rng, ev.lms[lang])
+                plain, info = dirty_plain(clean, sev, rng)
+                emit(
+                    "dirty",
+                    wordhom_instance(
+                        f"dirty/{lang}/{shape}_{tag}",
+                        plain,
+                        targets,
+                        rng,
+                        dict(
+                            base,
+                            shape=shape,
+                            dirty=tag,
+                            severity=sev,
+                            noise_info={k: v for k, v in info.items()},
+                            clean_ids=clean.tolist(),
+                        ),
+                        n_types=nt,
                     ),
-                    n_types=nt,
-                ),
-            )
+                )
         # mixed positive: lang | other-block | lang, one key from lang's targets
         if "mixed" not in controls:
             continue
@@ -580,6 +589,14 @@ def main():
     p.add_argument("--controls", nargs="*", default=None, choices=CONTROLS,
                    help="prepare only these controls (merged into the manifest)")
     p.add_argument("--only", nargs="*", default=None)
+    p.add_argument(
+        "--shapes",
+        nargs="*",
+        default=list(SHAPES),
+        choices=list(SHAPES),
+        help="prepare: shapes of the dirty positives to (re)build (default both; "
+        "the other controls keep their own shape sets)",
+    )
     p.add_argument("--hyps", nargs="+", default=list(LANGS))
     p.add_argument("--workers", type=int, default=12)
     p.add_argument("--fresh", action="store_true")

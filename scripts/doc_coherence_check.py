@@ -114,6 +114,12 @@ PHRASE_RULES = [
         ),
     ),
     (
+        "dirty5-replicate",
+        r"dirty[- ]5 ?%[^.\n]{0,80}(did not replicate|not replicated)|(did not replicate|not replicated)[^.\n]{0,60}dirty",
+        r"B[- ]shape|Blike|A[- ]shape|2026-09-03|09-03|§10\.6|superseded|5\.18",
+        "the dirty-5 % German non-replication is the A-shape result; at B shape it is called 2/2 (docs/project_status.md §5.18)",
+    ),
+    (
         "recovered-at-3",
         r"recovers? (a )?key at 3(\.0)? tokens? per type",
         r"corrected|originally|nothing at|false|4\.1",
@@ -165,7 +171,9 @@ def check_banners(f: Findings, docs: list[Path]) -> None:
             continue
         n = p.read_text(encoding="utf-8").count(BANNER_MARK)
         if n != 1:
-            f.err(f"banner: {rel(p)} has {n} '{BANNER_MARK}' paragraphs (need exactly 1)")
+            f.err(
+                f"banner: {rel(p)} has {n} '{BANNER_MARK}' paragraphs (need exactly 1)"
+            )
 
 
 def status_date(f: Findings) -> str | None:
@@ -175,7 +183,9 @@ def status_date(f: Findings) -> str | None:
     head = STATUS_DOC.read_text(encoding="utf-8")[:2000]
     m = re.search(r"Status date:\s*\*{0,2}(\d{4}-\d{2}-\d{2})", head)
     if not m:
-        f.err("status-doc: docs/project_status.md has no 'Status date: YYYY-MM-DD' line near the top")
+        f.err(
+            "status-doc: docs/project_status.md has no 'Status date: YYYY-MM-DD' line near the top"
+        )
         return None
     return m.group(1)
 
@@ -186,11 +196,23 @@ def check_status_fresh(f: Findings, sdate: str | None) -> None:
     status_rel = rel(STATUS_DOC)
     # Working-tree changes (staged + unstaged + untracked) under docs/, CLAUDE.md.
     porcelain = git("status", "--porcelain", "--", "docs", "CLAUDE.md")
-    changed = {line[3:].strip().split(" -> ")[-1] for line in porcelain.splitlines() if line.strip()}
+    changed = {
+        line[3:].strip().split(" -> ")[-1]
+        for line in porcelain.splitlines()
+        if line.strip()
+    }
     status_touched = status_rel in changed
     changed.discard(status_rel)
     # Committed after the status date but status doc not re-dated.
-    committed = git("log", f"--since={sdate}T23:59:59", "--name-only", "--format=", "--", "docs", "CLAUDE.md")
+    committed = git(
+        "log",
+        f"--since={sdate}T23:59:59",
+        "--name-only",
+        "--format=",
+        "--",
+        "docs",
+        "CLAUDE.md",
+    )
     committed_set = {c.strip() for c in committed.splitlines() if c.strip()}
     committed_set.discard(status_rel)
     # Memory dir is outside the repo: compare mtimes to the status date.
@@ -244,7 +266,9 @@ def check_refs(f: Findings, files: list[Path], label: str) -> None:
                 line_text = text.splitlines()[line - 1]
                 if REF_ABSENT_OK.search(line_text):
                     continue
-                f.err(f"refs: {label}{rel(p)}:{line}: `docs/{m.group(1)}` does not exist")
+                f.err(
+                    f"refs: {label}{rel(p)}:{line}: `docs/{m.group(1)}` does not exist"
+                )
 
 
 def check_sections(f: Findings, docs: list[Path]) -> None:
@@ -252,7 +276,9 @@ def check_sections(f: Findings, docs: list[Path]) -> None:
         nums = SECTION_RE.findall(p.read_text(encoding="utf-8"))
         dups = sorted({n for n in nums if nums.count(n) > 1})
         if dups:
-            f.err(f"sections: {rel(p)} has duplicated section numbers: {', '.join(dups)}")
+            f.err(
+                f"sections: {rel(p)} has duplicated section numbers: {', '.join(dups)}"
+            )
 
 
 def check_memory(f: Findings) -> list[Path]:
@@ -279,7 +305,9 @@ def check_memory(f: Findings) -> list[Path]:
         for line in p.read_text(encoding="utf-8").splitlines()[:8]:
             if line.startswith("description:"):
                 for name, trig, qual, msg in PHRASE_RULES:
-                    if re.search(trig, line, re.IGNORECASE) and not re.search(qual, line, re.IGNORECASE):
+                    if re.search(trig, line, re.IGNORECASE) and not re.search(
+                        qual, line, re.IGNORECASE
+                    ):
                         f.err(f"memory-desc[{name}]: {p.name}: {msg}")
     return files
 
@@ -288,7 +316,10 @@ def check_claude_md(f: Findings, sdate: str | None) -> None:
     if not CLAUDE_MD.exists():
         f.err("claude-md: CLAUDE.md missing")
         return
-    m = re.search(r"### Current status \((\d{4}-\d{2}-\d{2})\)", CLAUDE_MD.read_text(encoding="utf-8"))
+    m = re.search(
+        r"### Current status \((\d{4}-\d{2}-\d{2})\)",
+        CLAUDE_MD.read_text(encoding="utf-8"),
+    )
     if not m:
         f.err("claude-md: CLAUDE.md has no '### Current status (YYYY-MM-DD)' heading")
         return
@@ -308,7 +339,9 @@ def run() -> Findings:
     check_banners(f, docs)
     sdate = status_date(f)
     check_status_fresh(f, sdate)
-    scripts = sorted((ROOT / "scripts").glob("*.py")) + sorted((ROOT / "diff_voyn").rglob("*.py"))
+    scripts = sorted((ROOT / "scripts").glob("*.py")) + sorted(
+        (ROOT / "diff_voyn").rglob("*.py")
+    )
     check_phrases(f, docs + [CLAUDE_MD], "")
     check_phrases(f, scripts, "")
     check_refs(f, docs + [CLAUDE_MD] + scripts, "")
@@ -321,8 +354,12 @@ def run() -> Findings:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--hook", choices=["stop", "session-start"], help="emit Claude Code hook JSON")
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    ap.add_argument(
+        "--hook", choices=["stop", "session-start"], help="emit Claude Code hook JSON"
+    )
     args = ap.parse_args()
     f = run()
     if args.hook:
@@ -331,30 +368,56 @@ def main() -> int:
             payload = json.loads(sys.stdin.read() or "{}")
         except (json.JSONDecodeError, OSError):
             pass
-        report = "\n".join(f"- {e}" for e in f.errors) or "documentation coherence check: clean"
+        report = (
+            "\n".join(f"- {e}" for e in f.errors)
+            or "documentation coherence check: clean"
+        )
         if args.hook == "stop":
             if f.errors and not payload.get("stop_hook_active"):
-                print(json.dumps({"decision": "block", "reason": (
-                    "Documentation coherence check failed (scripts/doc_coherence_check.py). "
-                    "Fix before finishing — dated records must stay labelled and "
-                    "docs/project_status.md must be brought forward:\n" + report)}))
+                print(
+                    json.dumps(
+                        {
+                            "decision": "block",
+                            "reason": (
+                                "Documentation coherence check failed (scripts/doc_coherence_check.py). "
+                                "Fix before finishing — dated records must stay labelled and "
+                                "docs/project_status.md must be brought forward:\n"
+                                + report
+                            ),
+                        }
+                    )
+                )
             elif f.errors:
                 # second pass in the same turn: do not loop, just surface
-                print(json.dumps({"systemMessage": "doc coherence still failing:\n" + report}))
+                print(
+                    json.dumps(
+                        {"systemMessage": "doc coherence still failing:\n" + report}
+                    )
+                )
             return 0
         # session-start: inform, never block
         if f.errors:
-            print(json.dumps({"hookSpecificOutput": {
-                "hookEventName": "SessionStart",
-                "additionalContext": "Documentation coherence check found drift at session start "
-                "(run `uv run python scripts/doc_coherence_check.py`):\n" + report}}))
+            print(
+                json.dumps(
+                    {
+                        "hookSpecificOutput": {
+                            "hookEventName": "SessionStart",
+                            "additionalContext": "Documentation coherence check found drift at session start "
+                            "(run `uv run python scripts/doc_coherence_check.py`):\n"
+                            + report,
+                        }
+                    }
+                )
+            )
         return 0
     for w in f.warnings:
         print(f"WARN  {w}")
     for e in f.errors:
         print(f"ERROR {e}")
     if f.errors:
-        print(f"\n{len(f.errors)} finding(s). See scripts/doc_coherence_check.py docstring and docs/project_status.md.")
+        print(
+            f"\n{len(f.errors)} finding(s). See scripts/doc_coherence_check.py docstring and docs/project_status.md."
+        )
         return 1
     print("documentation coherence check: clean")
     return 0
