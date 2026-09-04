@@ -1,0 +1,9 @@
+# latexmk build products (the PDF is kept)
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.toc
+*.synctex.gz
+figures/__pycache__/
