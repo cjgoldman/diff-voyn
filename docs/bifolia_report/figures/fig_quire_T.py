@@ -1,4 +1,4 @@
-"""fig_quire_T: quire T (f103–f116; 6 sheets, 23 pages, Currier B, hand 3, 10 673 tokens).
+"""fig_quire_T: quire T (f103–f116; 6 sheets, 23 pages, Currier B, hand 3, 10,673 tokens).
 
 (a) All 720 stacked sheet orders scored on the real contents (between-sheet L1, 7-grams,
     IT2a), as within-candidate z; the same on 20 content shuffles (grey outline) and the

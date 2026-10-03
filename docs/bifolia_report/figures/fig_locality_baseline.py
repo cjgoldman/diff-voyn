@@ -2,7 +2,7 @@
 
 (a) P(consecutive gap <= 100 tokens) / uniform-placement expectation, by frequency
     class k = 2..5 (docs/doubleton_gaps.md §6.1; data/rare_types.json).
-(b) Corpus sweep: the same ratio, pooled over k = 2..5, for 148 known 37 759-token
+(b) Corpus sweep: the same ratio, pooled over k = 2..5, for 148 known 37,759-token
     windows (§9; data/corpus_sweep.json), with the manuscript marked.
 """
 
@@ -121,7 +121,7 @@ bx.grid(False)
 bx.grid(True, axis="x")
 ax.set_xticks(KS)
 bx.set_xlabel("P(gap ≤ 100) / uniform, types with 2–5 occurrences pooled")
-bx.set_title("148 known windows of 37 759 tokens", loc="left", pad=10)
+bx.set_title("148 known windows of 37,759 tokens", loc="left", pad=10)
 panel_label(bx, "(b)", x=-0.2)
 
 save(fig, "fig_locality_baseline")

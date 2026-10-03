@@ -52,7 +52,7 @@ ax.set_ylim(0, 78)
 ax.set_xlabel("fit of the order (sd from the average order; lower = better)", fontsize=7.2)
 ax.set_ylabel("number of orders", fontsize=7.2)
 ax.legend(loc="upper right", fontsize=6.4, handlelength=1.4)
-ax.text(0.99, 0.6, "7-letter glyph strings,\nIT2a transcription", transform=ax.transAxes, ha="right", va="top", fontsize=6.4, color=INK2)
+ax.text(0.99, 0.5, "7-letter glyph\nstrings, IT2a\ntranscription", transform=ax.transAxes, ha="right", va="top", fontsize=6.4, color=INK2)
 panel_label(ax, "(a)", x=-0.14)
 
 # ---- (b) as bound vs the chain --------------------------------------------------

@@ -1,0 +1,70 @@
+{
+ "note": "quire T, IT2a, word unit; burst scale per scripts/quire_order_burst.py (shrunk mean home gap, floor 30); derive_burst_example.py",
+ "quire": "T",
+ "lambda0": 351.8333333333333,
+ "n_types": 390,
+ "n_candidates": 15,
+ "sheet_len": {
+  "1": 1508,
+  "2": 1739,
+  "3": 1569,
+  "4": 1869,
+  "5": 1752,
+  "6": 2236
+ },
+ "sheet_folios": {
+  "1": "f103/f116",
+  "2": "f104/f115",
+  "3": "f105/f114",
+  "4": "f106/f113",
+  "5": "f107/f112",
+  "6": "f108/f111"
+ },
+ "burst": {
+  "word": "qokaly",
+  "home_sheet": 1,
+  "home_folios": "f103/f116",
+  "home_len": 1508,
+  "home_positions": [
+   292,
+   343,
+   458
+  ],
+  "home_gaps": [
+   51,
+   115
+  ],
+  "lambda": 172.6111111111111,
+  "stray_sheet": 5,
+  "stray_folios": "f107/f112",
+  "stray_len": 1752,
+  "stray_page": "f107v",
+  "stray_offset": 601,
+  "d_after": 1651,
+  "score_after": 9.564853556485357
+ },
+ "spread": {
+  "word": "chckhedy",
+  "home_sheet": 6,
+  "home_folios": "f108/f111",
+  "home_len": 2236,
+  "home_positions": [
+   29,
+   1509,
+   1946
+  ],
+  "home_gaps": [
+   1480,
+   437
+  ],
+  "lambda": 756.2777777777778,
+  "stray_sheet": 4,
+  "stray_folios": "f106/f113",
+  "stray_len": 1869,
+  "stray_page": "f113v",
+  "stray_offset": 1567,
+  "d_after": 1857,
+  "score_after": 2.4554469991919485
+ },
+ "between_sheet": 2
+}

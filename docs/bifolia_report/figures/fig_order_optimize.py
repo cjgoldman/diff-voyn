@@ -2,7 +2,7 @@
 toward the known-text corpus?  Simulated annealing over sheet orders under four
 constraint levels (§10; data/order_optimize_none.json, orientation fixed).
 
-(a) P(gap ≤ 1000)/uniform (r1000) after optimisation: the manuscript from its
+(a) P(gap ≤ 1,000)/uniform (r1000) after optimisation: the manuscript from its
     stacked order, from three random sheet orders, and three page-content-shuffled
     manuscripts (no order information — the noise ceiling); corpus percentiles.
 (b) The same for P(gap ≤ 100)/uniform (r100), which sheet order barely moves.
@@ -46,7 +46,7 @@ for ax, stat, title in ((axes[0], "r1000", "(a)  $r_{1000}$ after re-ordering"),
     ax.set_xticklabels(LABELS, fontsize=7, rotation=30, ha="right", rotation_mode="anchor")
     ax.set_xlabel("sheets may swap within …")
     ax.set_title(title, loc="left", fontsize=7.8, pad=4)
-    ax.set_ylabel("P(gap ≤ 1000) / uniform" if stat == "r1000" else "P(gap ≤ 100) / uniform")
+    ax.set_ylabel("P(gap ≤ 1,000) / uniform" if stat == "r1000" else "P(gap ≤ 100) / uniform")
     ax.set_xlim(-0.3, len(LEVELS) - 0.7)
 
 # corpus percentiles (source: data/corpus_sweep.log, k 2..5 pooled)

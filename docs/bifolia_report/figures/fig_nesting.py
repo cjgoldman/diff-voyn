@@ -1,6 +1,6 @@
 """Alternative nesting patterns (record §19): does any other way of gathering a
 quire's sheets do as well as the stacked optimum?  Source: data/quire_order_nesting_{Q}.json
-(L1 cost only -- the burst family is biased toward stacked patterns in this space).
+(L1 cost only -- the cluster family is biased toward stacked patterns in this space).
 
 (a) best L1 cost per number of nested blocks (1 = fully nested ... S = fully stacked),
     standardised within the quire's candidate set, n = 7 glyph n-grams, both transcriptions;

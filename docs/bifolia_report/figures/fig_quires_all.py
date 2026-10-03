@@ -1,6 +1,6 @@
 """fig_quires_all: one-quire seriation across quires T, M, C, A, B.
 
-Per quire, per unit (words, glyph n-grams n5..n8) and metric (L1, burst, blog, modal), the
+Per quire, per unit (words, glyph n-grams n5..n8) and metric (L1, cluster, blog, modal), the
 best stacked sheet order and its content-shuffle p (best-of-candidates on the real
 contents vs best-of-candidates on 200 draws with page contents permuted within the
 quire; floor 1/201).  Cell colour = -log10 p (single-hue sequential); cell text = the
@@ -18,7 +18,8 @@ QUIRES = ["T", "M", "C", "A", "B"]
 NCAND = {"T": 720, "M": 120, "C": 24, "A": 24, "B": 24}
 UNITS = ["words", "n5", "n6", "n7", "n8"]
 UNIT_LBL = {"words": "words", "n5": "5-gram", "n6": "6-gram", "n7": "7-gram", "n8": "8-gram"}
-METRICS = ["L1", "burst", "blog", "modal"]
+METRICS = ["L1", "burst", "blog", "modal"]  # JSON keys
+LABELS = ["L1", "cluster", "blog", "modal"]  # display names
 TRS = ["IT2a", "RF1b"]
 # the winning family per quire (docs §15): exact best or one adjacent transposition away
 FAMILY = {"T": ["165423"], "M": ["23514", "32514", "41235"], "C": ["1432"], "A": [], "B": []}
@@ -63,7 +64,7 @@ for qi, Q in enumerate(QUIRES):
                         fontweight="bold" if fam else "normal")
         ax.imshow(P, cmap=CMAP_SEQ, norm=norm, aspect="auto", interpolation="nearest")
         ax.set_xticks(range(len(METRICS)))
-        ax.set_xticklabels(METRICS if qi == len(QUIRES) - 1 else [""] * 4, fontsize=7)
+        ax.set_xticklabels(LABELS if qi == len(QUIRES) - 1 else [""] * 4, fontsize=7)
         ax.set_yticks(range(len(UNITS)))
         ax.set_yticklabels([UNIT_LBL[u] for u in UNITS] if ti == 0 else [""] * 5, fontsize=6.8)
         ax.tick_params(length=0)

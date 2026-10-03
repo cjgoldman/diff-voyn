@@ -10,6 +10,7 @@
 \linespread{1.04}
 \usepackage[margin=2.4cm]{geometry}
 \usepackage{microtype}
+\usepackage{indentfirst}   % indent the first paragraph after every heading too
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
 \usepackage{array}
@@ -18,6 +19,7 @@
 \usepackage{siunitx}
 \usepackage{graphicx}
 \usepackage{xcolor}
+\usepackage{colortbl}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,calc,decorations.pathreplacing}
 \usepackage{caption}
@@ -33,6 +35,7 @@
 \renewcommand{\floatpagefraction}{.85}\renewcommand{\textfraction}{.07}
 \usepackage[colorlinks=true,linkcolor=rf1b,citecolor=rf1b,urlcolor=rf1b]{hyperref}
 \usepackage[capitalise,noabbrev]{cleveref}
+\crefname{subfigure}{Figure}{Figures}
 
 % ---- colours matching figures/style.py ---------------------------------------
 \definecolor{it2a}{HTML}{2A78D6}
@@ -155,9 +158,16 @@
 \newcommand{\esX}{\esdot{muted}\esdot{muted}\esdot{muted}}
 \newtcolorbox{recordnote}{colback=grid!40!white,colframe=muted,boxrule=0.4pt,arc=1pt,
   left=6pt,right=6pt,top=3pt,bottom=3pt,fontupper=\small}
+% thin grey rule between the rows of Table S1
+\newcommand{\rowsep}{\arrayrulecolor{grid}\specialrule{0.4pt}{2.5pt}{3.5pt}\arrayrulecolor{black}}
+% sheet chips for the executive summary's order table (Table S1): the sheet number in a
+% box coloured by physical position as in the chains figure (fig:chains), folios beneath
+\newcommand{\shchip}[1]{\ifnum#1>3 \def\shtc{white}\else\def\shtc{black!85}\fi
+  \tikz[baseline=-0.55ex]{\node[fill=sheet#1,rounded corners=1.2pt,inner sep=0pt,minimum width=1.2em,minimum height=1.2em,font=\sffamily\bfseries\scriptsize,text=\shtc] {#1};}}
+\newcommand{\shf}[3]{\begin{tabular}[t]{@{}c@{}}\shchip{#1}\\[-1pt]{\tiny\sffamily\color{ink2}#2}\\[-3.5pt]{\tiny\sffamily\color{ink2}#3}\end{tabular}}
 
-\title{\sffamily\bfseries\LARGE Rare Text Locality and Bifolium Order in the Voynich Manuscript\\[2pt]
-\Large A Diffusion Language Judge Side Project}
+\title{\sffamily\bfseries\LARGE Bifolium Order in the Voynich Manuscript\\[2pt]
+\Large A Diffusion Language Judge Side Quest}
 \author{\sffamily CJ Goldman}
 \date{\sffamily 3 September 2026}
 
@@ -165,26 +175,27 @@
 \maketitle
 
 \begin{abstract}
-\noindent
-The Voynich Manuscript is bound as quires of nested bifolia. Lisa Fagin Davis has proposed, in a public lecture, that the bifolia were meant to be read \emph{stacked} one after another rather than nested as they are currently bound. She also reported a collaborator's attempt to test this hypothesis with latent semantic analysis. The order of the text bears on the larger diffusion-guided decipherment project, but no published account of that test could be found, so an internal analysis had to be made.
+The Voynich Manuscript is bound as quires of nested sheets (bifolia). Lisa Fagin Davis has proposed, in a public lecture, that the sheets were meant to be read as \emph{stacked} bifolia, rather than nested as they are currently bound. She also reported a collaborator's attempt to test this hypothesis with latent semantic analysis. The order of the text bears on the larger diffusion-guided decipherment project, but no published account of that test could be found, so an internal analysis had to be made.
 
-This report describes an independent attempt to find order with a different instrument: the positions of \emph{rare text material}, the word types and glyph $n$-grams that occur 2--10 times, under a permutation null and known-text controls. It has three main findings.
+This report describes an independent attempt to find order with a different instrument: the positions of \emph{rare text}: the word types and glyph $n$-grams that occur 2--10 times, under a permutation null and known-text controls. It has three main findings.
 \begin{enumerate}[leftmargin=2.2em,itemsep=0.35ex,topsep=0.6ex,label=(\roman*)]
-\item The manuscript's rare vocabulary is about one tenth as local as that of prose and sits at the bottom of a corpus of known texts; this sets the power of every order test.
-\item Across the manuscript, the two leaves of one physical sheet share rare material more than leaves that are neighbours only in the binding. The result holds on words and on glyph $n$-grams, on both transcriptions, with quire, Currier language and scribal hand held fixed, and no other way of gathering a quire's sheets (up to 23\,040 nesting patterns per quire) does as well as the best stacked order. \textbf{This suggests the interleaved (nested) binding is wrong: the manuscript is mis-bound at the sheet level}---or that the sheet was the unit of production; the text alone cannot tell the two apart (\cref{sec:discussion}).
+\item The manuscript's rare text is about one tenth as local as that of prose and sits at the bottom of a corpus of known texts; this sets the power of every order test.
+\item Across the manuscript, the two leaves of one physical sheet share rare text more than leaves that are neighbours only in the binding. The result holds on words and on glyph $n$-grams, on both transcriptions, with quire, Currier language and scribal hand held fixed, and no other way of gathering a quire's sheets (up to 23,040 nesting patterns per quire) does as well as the best stacked order. \textbf{This suggests the interleaved (nested) binding is wrong: the manuscript is mis-bound at the sheet level}---or that the sheet was the unit of production; the text alone cannot tell the two apart (\cref{sec:discussion}).
 \item The same statistic seriates the sheets inside a quire. Quire~T settles on a single order of its six sheets whichever text unit or cost function is used. Quire~C, in a different language and hand, likewise settles on one order; quire~M is consistent with a single family of orders; the two small herbal quires are uninformative. Reading direction is not recovered. \textbf{This suggests the original order of the sheets within a quire can be recovered from the text, up to reversal.}
 \end{enumerate}
-\noindent
-Findings (ii) and (iii) are unusually robust for quantitative work on the manuscript: the winning answers stand well clear of the field. The excess sharing between the two halves of a sheet is three to five standard deviations above what random placement of the rare material produces. This effect is seen in two different transcriptions and across multiple quires. In quire~T the winning sheet order lies three to four standard deviations from the average of the 720 possible stacked orders and about four from the average of all 23\,040 ways of gathering the sheets.
+
+Findings (ii) and (iii) are unusually robust for quantitative work on the manuscript: the winning answers stand well clear of the field. The excess sharing between the two halves of a sheet is three to five standard deviations above what random placement of the rare text produces. This effect is seen in two different transcriptions and across multiple quires. In quire~T the winning sheet order lies three to four standard deviations from the average of the 720 possible stacked orders and about four from the average of all 23,040 ways of gathering the sheets.
 
 \end{abstract}
-
-\begin{recordnote}
-\textbf{Record status.} Standalone write-up of \texttt{docs/doubleton\_gaps.md} \S2--19 as of 2026-09-03 (a side study of the diff-voyn project; no solver, judge or verdict of the decipherment programme depends on it). Every number below is traceable to a section of that record, marked \src{N}; the record's later corrections (\S16 on reversal-equivalence) are applied throughout. Data, figure code and this source live in \texttt{docs/bifolia\_report/}.
-\end{recordnote}
+\clearpage
 
 \setcounter{tocdepth}{2}
 \tableofcontents
+
+\bigskip
+\begin{recordnote}
+\textbf{Record status.} Standalone write-up of \texttt{docs/doubleton\_gaps.md} \S2--19 as of 2026-09-03 (a side study of the diff-voyn project; no solver, judge or verdict of the decipherment programme depends on it). Every number below is traceable to a section of that record, marked \src{N}; the record's later corrections (\S16 on reversal-equivalence) are applied throughout. Data, figure code and this source live in \texttt{docs/bifolia\_report/}. Throughout, \emph{sheet} is used for what codicology calls a bifolium: one piece of parchment folded once into two leaves.
+\end{recordnote}
 %=====================================================================
 \clearpage
 \section*{Executive summary}
@@ -193,100 +204,154 @@ Findings (ii) and (iii) are unusually robust for quantitative work on the manusc
 \setcounter{figure}{0}\setcounter{table}{0}
 \renewcommand{\thefigure}{S\arabic{figure}}\renewcommand{\thetable}{S\arabic{table}}
 
-\noindent
-\textit{This summary is written for readers who are not statisticians. It states the four findings of the report, shows the one picture that carries each, and says what the findings do and do not mean. Every number is documented in the numbered sections that follow, and the closing table gives the section for each claim.}
 
-\subsection*{The question}
+\subsection*{The question: stacked or nested?}
 
-A medieval book is not made of single pages. Its parchment comes in \emph{sheets} (bifolia), each folded once down the middle to give two \emph{leaves} and four pages, and several folded sheets are nested one inside another to make a \emph{quire}, which is then sewn (\cref{fig:es-schematic}). Read as bound, the front half of the outermost sheet is the first leaf of the quire and its back half is the last: the two halves of one sheet can be many pages apart, and the pages that follow one another are mostly on \emph{different} sheets. Lisa Fagin Davis has suggested, in a public lecture, that the Voynich Manuscript's sheets were meant to be read whole, one after another---\emph{stacked}---and that the nested binding we have is a later mis-assembly. She also reported a colleague's attempt to test this from the text; no published account of it has been found, so the present report is an independent second attempt with a different instrument.
-
-\paragraph{The instrument: where rare words recur.} In ordinary prose a word used only two or three times in a whole book is a topic word, and its uses fall in the same passage. So a text written continuously carries a memory of its own writing order: its rare words cluster along that order, and if the pages were later assembled differently the clustering ends up straddling the ``wrong'' pairs of pages. We count where the recurrences of rare material fall---rare words, and also rare strings of five to eight glyphs, which do not depend on any theory of what a Voynich ``word'' is---and compare the counts with two yardsticks: what random placement of the manuscript's own pages would give, and what six real texts (Latin, German and Italian; prose and verse) give when they are written onto the manuscript's own pages in one order or the other. ``Standard deviations from chance'' below measures how far an observation lies from random placement; $+2$ is a roughly 1-in-40 event, $+4$ roughly 1-in-30\,000.
+The Voynich Manuscript is made of several folded vellum sheets known as bifolia. These bifolia are nested one inside another to form gatherings commonly referred to as quires. This construction results in the page order shown in \cref{fig:es-schematic-a}, where the first folium of a bifolium is not adjacent to its second folium, except for the innermost bifolium.
+There has been some speculation that the manuscript was incorrectly bound some time after it was written. Lisa Fagin Davis has suggested, in a lecture at the Centre for Medieval Studies at the University of Toronto\footnote{Link to video of lecture given September 26, 2025: \url{https://youtu.be/nH28ltqYIyo?si=mhQL64gOIs475cNN&t=2122}}, that the Voynich Manuscript's bifolia were meant to be assembled one after another in \emph{stacks} of folded bifolia as depicted in \cref{fig:es-schematic-b}. She also reported that she was working with Colin Layfield to use Latent Semantic Analysis (LSA) to test the "out of order" hypothesis. Layfield and Davis recently released a paper exploring coherence and flow in the Voynich Manuscript using LSA\footnote{Colin Layfield and Lisa Fagin Davis, ``The Application of Latent Semantic Analysis to the Voynich Manuscript,'' \emph{Digital Humanities Quarterly} 20, no.~1 (2026), \url{https://doi.org/10.63744/2ezxpskcezq4}.}, but a paper that addresses the codicological structure using LSA has not been published yet.
+Since understanding the intended order of the text in the Voynich is critical to the larger diffusion language judge project, we attempted to address the "out of order" hypothesis using a different technique that leverages rare text. This report describes the work done and the results that support Davis "out of order" hypothesis. 
 
 \begin{figure}[htbp]
 \centering
+\begin{subfigure}[t]{0.48\textwidth}
+\centering
 \begin{tikzpicture}[x=1cm,y=1cm,font=\sffamily\scriptsize]
-\begin{scope}[shift={(1.75,0)}]
-  \node[anchor=south west,font=\sffamily\footnotesize,color=ink2] at (-1.75,0.62) {\textbf{as bound:} three sheets nested one inside the next};
   \qnested{3}
   \qfacecallout
   \qfoldmark{-1.5}{1.72}
   \qfoldlabel{-1.9}{-3.32}{\textbf{joined at the fold:} the two halves of one sheet --- pages \mbox{1--2} and \mbox{11--12}, as far apart as the quire allows}
   \qreadarrow{6}
   \qbracket{leaf1a}{leaf2a}{nestedc}{0.15}{-0.05}{\textbf{neighbours in the binding,} on different sheets: pages 2 and 3}
-\end{scope}
-\begin{scope}[shift={(9.6,0)}]
-  \node[anchor=south west,font=\sffamily\footnotesize,color=ink2] at (-0.8,0.62) {\textbf{stacked:} each sheet folded on its own, then the next};
+\end{tikzpicture}
+\caption{\textbf{Nested:} three sheets nested one inside the next.}
+\label{fig:es-schematic-a}
+\end{subfigure}\hfill
+\begin{subfigure}[t]{0.48\textwidth}
+\centering
+\begin{tikzpicture}[x=1cm,y=1cm,font=\sffamily\scriptsize]
   \qstacked{3}
   \qfoldmark{-0.3}{0.5}
   \qfoldlabel{-0.95}{-3.32}{\textbf{joined at the fold:} the two halves of one sheet are now pages 1--4, read one after the other}
   \qreadarrow{6}
   \qbracket{leaf1a}{leaf2a}{nestedc}{0.15}{-0.55}{\textbf{the former binding neighbours} are two leaves apart: pages 2 and 5}
-\end{scope}
 \end{tikzpicture}
-\caption{The two arrangements being compared, drawn as a quire of three sheets seen from its top edge, spine at the left. Each folded sheet gives two leaves ($a$ above the fold, $b$ below); each leaf has a front face ($r$) and a back face ($v$); the small numbers are the order in which the faces are read---down the pile, front then back of each leaf. Left: nested as bound, so the two halves of a sheet lie at opposite ends of the quire and the pages that follow one another are mostly on different sheets. Right: the same sheets each folded on their own and laid one after the next (stacked), so a sheet's four pages are read together. The report's central test asks which pairs of leaves share rare material: the two halves of one sheet (aqua, joined at the fold) or leaves that are neighbours only in the binding (red bracket).}
+\caption{\textbf{Stacked:} each sheet folded on its own, then the next.}
+\label{fig:es-schematic-b}
+\end{subfigure}
+\caption{A quire of three sheets seen from its top edge, spine at the left: nested as bound (a) and stacked (b). Each folded sheet gives leaves $a$ (above the fold) and $b$ (below); the small numbers are the reading order, down the pile, front face then back. The report's central test asks which pair of leaves shares more rare text: the two halves of one sheet, joined at the fold, or leaves that are neighbors only in the binding.}
 \label{fig:es-schematic}
 \end{figure}
 
-\subsection*{Finding 1 --- The manuscript's rare words hardly cluster at all}
+\subsection*{The instrument: where rare text recurs}
+In ordinary prose, a word that is used only two or three times typically clusters its uses over a few paragraphs or pages. If the pages were later assembled in a different order, these rare words would tend to move apart. As we describe below, the Voynich Manuscript has relatively few types of rare tokens that are found on multiple folia (see \cref{fig:es-raretext} Top for an example). Although a signal is present, it is a little weaker than we would prefer.  
+Luckily, the same effect is seen in rare strings of glyphs. These strings are between five to eight glyphs long, ignore spaces, and can span words (see \cref{fig:es-raretext} Bottom for an example). The use of rare glyph strings provides a stronger signal and does not assume that Voynich token is equivalent to a word. 
+
+We want a metric that describes how clustered these instances of rare text are. The measurement is the distance between two uses of the same rare word or glyph string along the reading order. For a whole text the ratio of Finding 1 is enough: short distances counted, divided by the count chance would give. To score a candidate order of the sheets, the plain average of the distances is poor, because it treats every rare word alike. A word whose uses cluster close together on one sheet, then appear once on another, says the two sheets were read together. A word spread over its sheet says little. So each stray use is scored as its distance to the word's home sheet in units of that word's home gap, the typical distance between its uses at home (\cref{fig:es-metric}). Ten home gaps away costs ten, whatever the word. An order's score is the sum over all the rare text, and the lowest wins.
+
+ 
+
 
 \begin{figure}[htbp]
 \centering
-\fig{fig_es_locality}
-\caption{How much closer together than chance a text's rare words sit. For every word used exactly twice, the chance that its two uses fall within 100 words of each other, divided by the same chance under random placement. Prose clusters 13--51 times more than chance; the manuscript 3.8--3.9 times, less than rhymed verse; either Currier language on its own, less still. (\cref{sec:baseline}, \cref{tab:locality}.)}
-\label{fig:es-locality}
+\fig{fig_es_raretext}
+\caption{Two types of rare text are used in the recurring rare text distance measurements, Voynich ``words'' and Voynich glyph strings. Top, \emph{words}: the Voynich word \emph{qorain} occurs four times, and is separated by 9,500--11,900 words between successive uses (10,507 words between the two shown, on f103r and f116r). Bottom, \emph{glyph strings}: the run of seven glyphs (with the spaces ignored) appears on f19r and 2,865 glyphs away on f22v inside a longer word.}
+\label{fig:es-raretext}
 \end{figure}
 
-In known prose a twice-used word's two occurrences fall within 100 words of each other 13 to 51 times more often than chance; in the manuscript, under four times (\cref{fig:es-locality}). Against 148 windows of known text cut to the manuscript's length, the manuscript sits at the extreme low edge, with only Tasso and Dante below it; the pattern is the same for words used three, four or five times, and in both of the manuscript's ``languages'' (Currier A and B). Its rare words cluster like the rare rhyme-words of narrative verse, not like the topic words of prose.
+\begin{figure}[htbp]
+\centering
+\fig{fig_es_metric}
+\caption{The cluster-scaled score on two words of quire T. Each row is read left to right as one candidate order: the word's home sheet, then the sheet holding its one stray use. Ticks are uses. The spacing of the uses at home sets the word's home gap, and the stray costs its distance to the nearest use at home divided by that gap. \emph{qokaly} clusters and \emph{chckhedy} spreads, so their strays sit at almost the same distance but cost 9.6 and 2.5 home gaps. The plain average would count them alike. The third row reads sheet 2 between the two: the distance and the cost grow, the home gap does not, because it is set on the home sheet alone. An order's score sums the cost of every stray use of rare text in the quire.}
+\label{fig:es-metric}
+\end{figure}
+
+\FloatBarrier
+\subsection*{Finding 1 --- The manuscript's rare text hardly clusters at all}
+
+In known prose, a twice-used word's two occurrences fall within 100 words of each other 13 to 51 times more often than chance; in the manuscript, under four times (\cref{fig:es-locality}, which pools words used two to five times). Against 148 windows of known text cut to the manuscript's length, the manuscript sits at the extreme low edge, with only Tasso and Dante below it; the pattern is the same for words used three, four or five times, and in both of the manuscript's ``languages'' (Currier A and B). Nor is this an artefact of the binding: re-ordering the manuscript's 52 sheets to make its rare text cluster as much as any order can lifts the figure only from 3.9 to 4.5, and a manuscript whose page contents were shuffled first is lifted by the same amount (\cref{sec:optimize}). Its rare text clusters like the rare rhyme-words of narrative verse, not like the topic words of prose.
 
 \emph{What this means.} Two things. First, every test of order in this report has to find its signal in a text with about a tenth of the locality of the control texts, so the tests are weak, and where a result is null that is the expected outcome rather than evidence of absence. Second, this is a property of the text itself, whatever it is: its rare ``words'' do not behave as topic words do.
 
-\subsection*{Finding 2 --- The two halves of a sheet belong together}
-
-\begin{figure}[htbp]
+\begin{figure}[H]
 \centering
-\fig{fig_es_leaftest}
-\caption{The leaf-pair test. Positive values: the two halves of one sheet share more rare material than pages that follow one another in the binding but lie on different sheets; negative: the reverse. The washes show what six real texts give when written onto the manuscript's own pages sheet by sheet (aqua) and in the binding order (red). (\cref{sec:leaf}, \cref{tab:leaf}.)}
-\label{fig:es-leaftest}
+\fig[0.85\textwidth]{fig_es_locality}
+\caption{Rare-text clustering, relative to chance: for words used two to five times, how often two consecutive uses fall within 100 words of each other, divided by the same rate under random placement. Known texts are windows of the manuscript's length. Prose clusters 9--30 times more than chance, verse 4--5, the manuscript as bound 3.9 (4.4 in the other transcription). The \emph{bifolia hypothesis} bar is the best of every re-ordering of its 52 sheets, each read whole: 4.5, the same gain the optimiser finds when the page contents are shuffled first. (\cref{sec:baseline}, \cref{sec:optimize}; \cref{tab:locality}, \cref{tab:optimize}.)}
+\label{fig:es-locality}
 \end{figure}
 
-Despite the weak signal, the two halves of a physical sheet share rare material more than the pages that are neighbours only in the binding do---and the binding-neighbours share \emph{less} than random pages of the same quire (\cref{fig:es-leaftest}). On rare words the excess is 2.4--2.5 standard deviations above chance; on rare seven-glyph strings, an independent unit run as the pre-stated check, it is 4 to 5. The six control texts settle what that size means: written sheet by sheet they land in the same band as the manuscript, written in the binding order they land far on the other side, on all 36 of 36 comparisons each way. Two objections were tested. The scribes' hands run by sheet (97\,\% of sheet halves are in one hand), so a scribe's private spelling habits could mimic the effect: holding the hand fixed in the comparison leaves the glyph-string result unchanged. And an excess this large might arise by accident: in 5\,000 random re-placements of the pages it never did, on either transcription. One caution belongs here: the test on words used exactly twice was null, the pooled word statistic was chosen after that, and the glyph-string test was then run as the check; the glyph-string number is the one to quote.
+\subsection*{Finding 2 --- The two halves of a sheet belong together}
+
+Despite the weak signal, the two halves of a physical sheet share rare text more than the pages that are neighbors only in the binding do---and the binding-neighbours share \emph{less} than random pages of the same quire (\cref{fig:leaftest}a in the main text). On rare word types the excess is 2.4--2.5 standard deviations above chance; on rare seven-glyph strings, an independent unit run as the pre-stated check, it is 4 to 5. The six control texts settle what that size means: written sheet by sheet they land in the same band as the manuscript, written in the binding order they land far on the other side, on all 36 of 36 comparisons each way. Two objections were tested. The scribes' hands run by sheet (97\,\% of sheet halves are in one hand), so a scribe's private spelling habits could mimic the effect: holding the hand fixed in the comparison leaves the glyph-string result unchanged. And an excess this large might arise by accident: in 5,000 random re-placements of the pages it never did, on either transcription. One caution belongs here: the test on words used exactly twice was null, the pooled word statistic was chosen after that, and the glyph-string test was then run as the check; the glyph-string number is the one to quote.
 
 \emph{What this means.} The text on one sheet is a unit. What this does \emph{not} decide is whether the sheet was the unit of \emph{reading} (Davis's proposal) or the unit of \emph{work}---one scribe, one sitting, one subject per sheet, with the nested reading order still intended. Every statistic in this report responds identically to the two.
 
 \subsection*{Finding 3 --- No other way of gathering the sheets fits as well}
 
-\begin{figure}[htbp]
-\centering
-\fig{fig_es_nesting}
-\caption{Every way of gathering the six sheets of quire T, 23\,040 patterns in all. (a)~The best fit obtainable when the sheets are gathered as one nested block (the binding among them) up to six blocks (every sheet read whole): the fit improves at every step toward reading sheets whole. (b)~Where three arrangements rank among the 23\,040: the best stacked order, the best fully nested order and the binding as it is. (\cref{sec:nesting}, \cref{tab:nesting}.)}
-\label{fig:es-nesting}
-\end{figure}
-
-Finding 2 compared the sheets read whole with one nested arrangement, the binding. Perhaps a different nesting, or two smaller gatherings placed one after another, would explain the text as well. For the six-sheet quire T every such pattern was scored, 23\,040 in all (\cref{fig:es-nesting}). The fit improves at every step from ``one nested block'' toward ``every sheet read whole''; the best fully nested arrangement ranks between 5\,007th and 10\,535th, the binding as it is between 13\,942nd and 22\,405th, and no pattern with two or three nested groups ever wins. The same holds, with smaller candidate sets and coarser odds, in the other four quires tested.
+Finding 2 compared the sheets read whole with one nested arrangement, the binding. Perhaps a different nesting, or two smaller gatherings placed one after another, would explain the text as well. For the six-sheet quire T every such pattern was scored, 23,040 in all. The fully nested orders are the worst group and a tight one, no member of it fitting better than an average pattern, while the stacked orders are the best group and the best of them is the best of all 23,040 (\cref{fig:es-nesting}); the mixed patterns lie in between, the fit improving at every step from ``one nested block'' toward ``every sheet read whole'' (\cref{fig:nesting-classes} in the main text). On glyph strings the best fully nested arrangement ranks between 5,007th and 10,535th, the binding as it is between 17,902nd and 22,405th (\cref{tab:nesting} in the main text), and no pattern with two or three nested groups ever wins. The same holds, with smaller candidate sets and coarser odds, in the other four quires tested.
 
 \emph{What this means.} The property the text rewards is exactly the one every stacked order has, a sheet's four pages kept together, and the comparison in Finding 2 was not a straw man: the binding is not merely worse than the best alternative, it is among the worst of all arrangements.
 
-\subsection*{Finding 4 --- Inside quire T the sheets have a preferred order}
-
-\begin{figure}[htbp]
+\begin{figure}[H]
 \centering
-\fig{fig_es_quireT}
-\caption{Which sheet follows which in quire T (the ``stars'' quire, f103--f116, six sheets). (a)~All 720 orders of the six sheets scored by how close together rare glyph strings fall; the grey histogram is where the \emph{best} of 720 lands when the pages' contents are shuffled, which is the bar the real winner must clear. (b)~The sheets as bound and in the order the text prefers; the direction of reading along the chain is not established. (\cref{sec:seriation}, \cref{tab:quires}.)}
-\label{fig:es-quireT}
+\fig[0.78\textwidth]{fig_es_nesting}
+\caption{The binding compared in Finding 2 was no straw man: all 720 ways of nesting quire T's six sheets (grey; the binding dotted) fit the rare text as poorly as it does, while the 720 orders reading each sheet whole (blue) fit better on average and their best (dotted) is the best of all 23,040 gatherings on glyph strings, 5th or 2nd on words (closer fit higher). The wide spread among stacked orders is what Finding 4 exploits. Boxes mean $\pm$ 1 sd, whiskers extremes, shades IT2a/RF1b. (\cref{sec:nesting}.)}
+\label{fig:es-nesting}
 \end{figure}
 
-If a sheet is a unit, the sharing between sheets can say which sheet followed which. For the six sheets of quire T there are 720 orders; one of them, \order{1-6-5-4-2-3} (outermost sheet first, then the innermost, then outward), is chosen by 31 of 32 combinations of text unit, cost function and transcription (\cref{fig:es-quireT}). It fits four standard deviations better than the average order, where the best of 720 orders on shuffled page contents sits near three; against those shuffles its odds are at most 1 in 50 on every test, and the size of the sheets alone cannot produce it. The current bound order lies in the bottom half. Quire C, a herbal quire in the other Currier language and another hand, settles the same way on \order{1-4-3-2} on 30 of 32 tests; quire M is consistent with one family of orders; the two smallest herbal quires (1\,000--1\,500 words) tell nothing. In each of T, C and M the outermost sheet neighbours the innermost.
+\subsection*{Finding 4 --- Inside quire T the sheets have a preferred order}
 
-\emph{What this means.} Within at least one quire the text remembers an order of its sheets, and it is not the bound order. What it does not give is the \emph{direction} of reading along the chain: the gap between the winning order and its reversal is no larger than selection alone produces on shuffled pages, and there is no time arrow inside a burst of rare words to calibrate on (prose bursts are symmetric to within a per cent). Nor can the order be attributed to reading rather than to working sheet by sheet, for the reason given under Finding 2.
+If a sheet is a unit, the sharing between sheets can say which sheet followed which. For the six sheets of quire T there are 720 orders; one of them, \order{1-6-5-4-2-3} (the outermost sheet beside the innermost, the rest running outward), is chosen by 31 of 32 combinations of text unit, cost function and transcription (\cref{fig:quireT}a in the main text; the orders and folios of all five quires are listed in \cref{tab:es-orders}). It fits four standard deviations better than the average order, where the best of 720 orders on shuffled page contents sits near three; against those shuffles its odds are at most 1 in 50 on every test, and the size of the sheets alone cannot produce it. The current bound order lies in the bottom half. Quire C, a herbal quire in the other Currier language and another hand, settles the same way on \order{1-4-3-2} on 30 of 32 tests; quire M is consistent with one family of orders; the two smallest herbal quires (1,000--1,500 words) give no single order. In each of T, C and M the outermost sheet neighbours the innermost.
+
+\emph{What this means.} Within at least one quire the text remembers an order of its sheets, and it is not the bound order. What it does not give is the \emph{direction} of reading along the chain: the gap between the winning order and its reversal is no larger than selection alone produces on shuffled pages, and there is no time arrow inside a cluster of rare text to calibrate on (prose clusters are symmetric to within a per cent). Nor can the order be attributed to reading rather than to working sheet by sheet, for the reason given under Finding 2.
+
+\begin{table}[H]
+\centering\footnotesize
+\renewcommand{\arraystretch}{1.05}\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}L{2.5cm}L{3.55cm}L{3.55cm}L{5.55cm}@{}}
+\toprule
+quire & sheets as bound (outer $\to$ inner) & order the text prefers & evidence\\
+\midrule
+\textbf{T} --- stars, f103--f116\newline Currier $B$, hand 3\newline 10,700 words &
+\shf{1}{f103}{f116}\hspace{3pt}\shf{2}{f104}{f115}\hspace{3pt}\shf{3}{f105}{f114}\hspace{3pt}\shf{4}{f106}{f113}\hspace{3pt}\shf{5}{f107}{f112}\hspace{3pt}\shf{6}{f108}{f111} &
+\shf{1}{f103}{f116}\hspace{3pt}\shf{6}{f108}{f111}\hspace{3pt}\shf{5}{f107}{f112}\hspace{3pt}\shf{4}{f106}{f113}\hspace{3pt}\shf{2}{f104}{f115}\hspace{3pt}\shf{3}{f105}{f114} &
+31 of 32 tests; odds $\le$ 1 in 50 vs shuffled pages on every test; bound order ranks 150th--626th of 720\\
+\rowsep
+\textbf{C} --- herbal, f17--f24\newline Currier $A$, hand 1\newline 1,400 words &
+\shf{1}{f17}{f24}\hspace{3pt}\shf{2}{f18}{f23}\hspace{3pt}\shf{3}{f19}{f22}\hspace{3pt}\shf{4}{f20}{f21} &
+\shf{1}{f17}{f24}\hspace{3pt}\shf{4}{f20}{f21}\hspace{3pt}\shf{3}{f19}{f22}\hspace{3pt}\shf{2}{f18}{f23} &
+30 of 32 tests; only 24 candidates, so the odds are coarse ($\le$ 1 in 20 on most tests); bound order ranks 4th--10th of 24\\
+\rowsep
+\textbf{M} --- biological, f75--f84\newline Currier $B$, hand 2\newline 6,900 words &
+\shf{1}{f75}{f84}\hspace{3pt}\shf{2}{f76}{f83}\hspace{3pt}\shf{3}{f77}{f82}\hspace{3pt}\shf{4}{f78}{f81}\hspace{3pt}\shf{5}{f79}{f80} &
+\shf{2}{f76}{f83}\hspace{3pt}\shf{3}{f77}{f82}\hspace{3pt}\shf{5}{f79}{f80}\hspace{3pt}\shf{1}{f75}{f84}\hspace{3pt}\shf{4}{f78}{f81} &
+one family of orders on glyph strings (also \order{3-2-5-1-4} and \order{4-1-2-3-5}; odds $\le$ 1 in 20 on 14 of 16 tests), not on words; bound order ranks 30th--114th of 120\\
+\rowsep
+\textbf{A} --- herbal, f1--f8\newline Currier $A$, hand 1\newline 1,500 words &
+\shf{1}{f1}{f8}\hspace{3pt}\shf{2}{f2}{f7}\hspace{3pt}\shf{3}{f3}{f6}\hspace{3pt}\shf{4}{f4}{f5} &
+{\color{ink2}stacked, but no single order: the winner changes with the text unit} &
+sheets read whole beat the binding (best stacked order 1st--3rd of 192 gatherings, the binding 31st--183rd), but not beyond what shuffled pages give ($P$ 0.09--0.36); bound order ranks 10th--20th of 24\\
+\rowsep
+\textbf{B} --- herbal, f9--f16\newline Currier $A$, hand 1\newline 1,000 words &
+\shf{1}{f9}{f16}\hspace{3pt}\shf{2}{f10}{f15}\hspace{3pt}\shf{3}{f11}{f14}\hspace{3pt}\shf{4}{f13}{alone} &
+{\color{ink2}stacked on glyph strings; no single order} &
+on glyph strings the best stacked order ranks 1st of 144 gatherings on all eight tests, the binding 46th--125th (on words the binding wins); no order beats shuffled pages: too little text (f12 is lost)\\
+\bottomrule
+\end{tabular}
+
+\caption{Sheet orders by quire. Sheets are numbered from the outside inward as bound (1 = outermost) and coloured by that position, as in \cref{fig:chains}; the folios beneath are the sheet's two leaves. Each sheet is read whole, front leaf then back, and the chains give \emph{adjacency only}: either end may be the beginning (\cref{sec:direction}).$^{\dagger}$}
+\label{tab:es-orders}
+\smallskip
+{\footnotesize $^{\dagger}$\,In quire T the winner puts f103/f116 at the \emph{end} of the chain on 22 of 24 tests, but the gap to the reverse reading is what selection alone gives on shuffled pages ($p$ 0.2--0.8), so no direction is claimed.}
+\end{table}
 
 \subsection*{What the report establishes, and what it does not}
 
 \begin{establishes}
 \begin{itemize}
-\item \textbf{The sheet is a unit of the text.} The two halves of a physical sheet share rare material more than pages that are neighbours only in the binding, on words and on glyph strings, in both transcriptions, with quire, language and scribal hand held fixed; real texts reproduce this only when written sheet by sheet (Finding 2).
+\item \textbf{The sheet is a unit of the text.} The two halves of a physical sheet share rare text more than pages that are neighbours only in the binding, on words and on glyph strings, in both transcriptions, with quire, language and scribal hand held fixed; real texts reproduce this only when written sheet by sheet (Finding 2).
 \item \textbf{The binding as it is fits the text worse than almost any other arrangement of the same sheets,} and nothing but reading the sheets whole fits as well (Finding 3).
-\item \textbf{Quire T has a recoverable sheet order,} \order{1-6-5-4-2-3}, replicated in shape by quire C (Finding 4).
-\item \textbf{The manuscript's rare words carry about a tenth of the locality of prose} (Finding 1), which is why the effects above are small in absolute terms: three quarters of twice-used words span more than one quire, and no re-ordering of the manuscript's 52 sheets makes its rare words cluster like those of prose.
+\item \textbf{Quire T has a recoverable sheet order,} \order{1-6-5-4-2-3}, replicated in shape by quire C (Finding 4, \cref{tab:es-orders}).
+\item \textbf{The manuscript's rare text carries about a tenth of the locality of prose} (Finding 1), which is why the effects above are small in absolute terms: three quarters of twice-used words span more than one quire, and no re-ordering of the manuscript's 52 sheets makes its rare text cluster like that of prose.
 \end{itemize}
 \end{establishes}
 
@@ -308,15 +373,15 @@ If a sheet is a unit, the sharing between sheets can say which sheet followed wh
 \toprule
 claim & strength & basis & where\\
 \midrule
-rare words cluster at $\approx$1/10 of prose & \esS & 148 known windows of equal length; both transcriptions & \cref{sec:baseline}\\
-sheet halves share more than binding neighbours & \esS & $+3$ to $+5$ sd on glyph strings; 0/5\,000 random placements; 36/36 controls each way; hand-controlled & \cref{sec:leaf}\\
-the effect is small in mass; no global re-ordering helps & \esS & rare words not contained by sheet; optimiser gains only its noise ceiling & \cref{sec:isnot}\\
-every other gathering of the sheets loses to reading them whole & \esS\,/\,\esM & decisive in quire T (23\,040 patterns); coarser in M and the four-sheet quires & \cref{sec:nesting}\\
+rare text clusters at $\approx$1/10 of prose & \esS & 148 known windows of equal length; both transcriptions & \cref{sec:baseline}\\
+sheet halves share more than binding neighbours & \esS & $+3$ to $+5$ sd on glyph strings; 0/5,000 random placements; 36/36 controls each way; hand-controlled & \cref{sec:leaf}\\
+the effect is small in mass; no global re-ordering helps & \esS & rare text not contained by sheet; optimiser gains only its noise ceiling & \cref{sec:isnot}\\
+every other gathering of the sheets loses to reading them whole & \esS\,/\,\esM & decisive in quire T (23,040 patterns); coarser in M and the four-sheet quires & \cref{sec:nesting}\\
 quire T order \order{1-6-5-4-2-3} & \esS & 31/32 tests; odds $\le$ 1 in 50 vs shuffled pages on every test; geometry excluded & \cref{sec:seriation}\\
 quire C order \order{1-4-3-2} & \esM & 30/32 tests, but only 24 candidates, so the odds are coarse & \cref{sec:seriation}\\
 quire M order family & \esW & consistent across units; words weak & \cref{sec:seriation}\\
 quires A and B & \esN & too little text; no information & \cref{sec:seriation}\\
-reading direction along a chain & \esN & gap to the reversal is what selection alone gives; no time arrow in bursts & \cref{sec:direction}\\
+reading direction along a chain & \esN & gap to the reversal is what selection alone gives; no time arrow in clusters & \cref{sec:direction}\\
 reading unit vs.\ working unit & \esX & not testable from text position & \cref{sec:discussion}\\
 \bottomrule
 \end{tabular}
@@ -332,7 +397,7 @@ reading unit vs.\ working unit & \esX & not testable from text position & \cref{
 \section{Question and codicological setting}
 \label{sec:question}
 
-A bifolium---one \emph{sheet}---is folded once into two \emph{leaves} $a$ and $b$, giving four \emph{pages} $a^r, a^v, b^r, b^v$. A quire of $S$ sheets nests them: sheet~1 is outermost, sheet~$S$ innermost. Read as bound, the page sequence is
+A \emph{sheet}---a bifolium, in the codicologist's term---is folded once into two \emph{leaves} $a$ and $b$, giving four \emph{pages} $a^r, a^v, b^r, b^v$. A quire of $S$ sheets nests them: sheet~1 is outermost, sheet~$S$ innermost. Read as bound, the page sequence is
 \begin{equation}
 1a^r,\,1a^v,\;2a^r,\,2a^v,\;\dots,\;Sa^r,\,Sa^v,\;Sb^r,\,Sb^v,\;\dots,\;2b^r,\,2b^v,\;1b^r,\,1b^v ,
 \label{eq:nested}
@@ -344,9 +409,9 @@ so the two leaves of an outer sheet are far apart and consecutive leaves mostly 
 \end{equation}
 and the two leaves of a sheet are always adjacent (\cref{fig:codicology}). Two kinds of leaf pair therefore discriminate the arrangements: \emph{conjugate} leaves (the two leaves of one sheet, adjacent only under stacked reading) and \emph{nested-adjacent} leaves (consecutive in the binding but on different sheets, adjacent only under nested reading).
 
-If a text was written continuously, words and phrases that belong to one passage sit close together \emph{in the writing order}. A rare word's recurrences are the cleanest carrier of that locality: a topic word used twice in 38\,000 words is used twice in the same passage. So the question ``was the text written in the nested order or the stacked order?'' becomes ``do conjugate leaves or nested-adjacent leaves share more rare material than chance?''---a question with a permutation null and known-text controls. Two further questions follow once the first is answered: whether the sheet sharing can \emph{order} the sheets of a quire (seriation), and whether it can give the \emph{direction} of reading along that order.
+If a text was written continuously, words and phrases that belong to one passage sit close together \emph{in the writing order}. The recurrences of rare text are the cleanest carrier of that locality: a topic word used twice in 38,000 words is used twice in the same passage. So the question ``was the text written in the nested order or the stacked order?'' becomes ``do conjugate leaves or nested-adjacent leaves share more rare text than chance?''---a question with a permutation null and known-text controls. Two further questions follow once the first is answered: whether the sheet sharing can \emph{order} the sheets of a quire (seriation), and whether it can give the \emph{direction} of reading along that order.
 
-\paragraph{Provenance of the proposal, and a prior attempt.} The stacked-bifolia proposal is, to our knowledge, not in print. Davis put it forward once, in a public lecture,\footnote{Recorded lecture, online video (c.\,2023--24); the link will be added to this report once retrieved. \emph{[URL pending.]}} and said there that a colleague at the University of Malta was trying to test it against the text with latent semantic analysis (LSA)---that is, whether the topical similarity of pages favours the stacked over the nested sequence. We have found no journal or preprint account of that analysis, so its statistic, its controls and its outcome are unknown to us, and nothing below builds on it. The present study is therefore not the first attempt to look for the arrangement in the text but a second one, made independently and with a different instrument: not topic vectors over whole pages but the positions of individual rare types, a permutation null that holds quire, Currier language and scribal hand fixed, and six known texts written onto the manuscript's own page slots as positive and negative controls. If the LSA result becomes available, the point at which the two approaches should agree is the sign of the conjugate-versus-nested contrast of \cref{sec:leaf}; they need not agree on the within-quire seriation of \cref{sec:seriation}, which uses a finer unit than any page-level topic model.
+\paragraph{Provenance of the proposal, and a prior attempt.} The stacked-sheet proposal is, to our knowledge, not in print. Davis put it forward once, in a public lecture,\footnote{Recorded lecture, online video (c.\,2023--24); the link will be added to this report once retrieved. \emph{[URL pending.]}} and said there that a colleague at the University of Malta was trying to test it against the text with latent semantic analysis (LSA)---that is, whether the topical similarity of pages favours the stacked over the nested sequence. We have found no journal or preprint account of that analysis, so its statistic, its controls and its outcome are unknown to us, and nothing below builds on it. The present study is therefore not the first attempt to look for the arrangement in the text but a second one, made independently and with a different instrument: not topic vectors over whole pages but the positions of individual rare types, a permutation null that holds quire, Currier language and scribal hand fixed, and six known texts written onto the manuscript's own page slots as positive and negative controls. If the LSA result becomes available, the point at which the two approaches should agree is the sign of the conjugate-versus-nested contrast of \cref{sec:leaf}; they need not agree on the within-quire seriation of \cref{sec:seriation}, which uses a finer unit than any page-level topic model.
 
 \begin{figure}[tbp]
 \centering
@@ -370,7 +435,7 @@ If a text was written continuously, words and phrases that belong to one passage
   \qbracket{leaf1a}{leaf2a}{nestedc}{0.15}{-0.55}{\textbf{nested-adjacent pairs} are now $\ge 2$ leaves apart}
 \end{scope}
 \end{tikzpicture}
-\caption{Nested versus stacked reading of a four-sheet quire, seen from its top edge with the spine at the left. Leaf $a$ of each sheet lies above its fold and leaf $b$ below; the numbers give the reading position of each leaf's front ($r$) and back ($v$) face, read down the pile. (a)~The binding, \cref{eq:nested}: conjugate leaves $\mathcal{C}$---the two leaves of one sheet, joined at the fold (aqua)---are separated by the whole inner quire, while the leaves that follow one another lie on different sheets (nested-adjacent pairs $\mathcal{N}$, red); the innermost sheet's two leaves are both at once ($\mathcal{B}$) and are excluded from the statistic. (b)~The stacked order, \cref{eq:stacked}: each sheet is read $a^r,a^v,b^r,b^v$, so conjugate leaves are consecutive and the former nested-adjacent pairs are at least two leaves apart. A text written in one order and bound in the other leaves its rare-word locality on the ``wrong'' leaf pairs.}
+\caption{Nested versus stacked reading of a four-sheet quire, seen from its top edge with the spine at the left. Leaf $a$ of each sheet lies above its fold and leaf $b$ below; the numbers give the reading position of each leaf's front ($r$) and back ($v$) face, read down the pile. (a)~The binding, \cref{eq:nested}: conjugate leaves $\mathcal{C}$---the two leaves of one sheet, joined at the fold (aqua)---are separated by the whole inner quire, while the leaves that follow one another lie on different sheets (nested-adjacent pairs $\mathcal{N}$, red); the innermost sheet's two leaves are both at once ($\mathcal{B}$) and are excluded from the statistic. (b)~The stacked order, \cref{eq:stacked}: each sheet is read $a^r,a^v,b^r,b^v$, so conjugate leaves are consecutive and the former nested-adjacent pairs are at least two leaves apart. A text written in one order and bound in the other leaves its rare-text locality on the ``wrong'' leaf pairs.}
 \label{fig:codicology}
 \end{figure}
 
@@ -378,11 +443,18 @@ If a text was written continuously, words and phrases that belong to one passage
 \section{Data, units and notation}
 \label{sec:data}
 
-\paragraph{Streams.} Both public EVA transcriptions are used throughout: Takahashi (\IT) and the Reference transcription (\RF). Tokens containing an uncertain glyph are dropped whole; extended-EVA codes and ligature braces are kept as part of the word type. In folio order the streams hold 37\,759 (\IT) / 38\,463 (\RF) tokens on 225 / 227 pages, mean 168 tokens per page; 896 / 997 doubleton types and 5\,527 / 6\,685 hapax types. Page headers supply quire, bifolium, Currier language ($A$/$B$), section and scribal hand (Davis's five scribes). \src{1}
+\paragraph{Streams.} Both public EVA transcriptions are used throughout: Takahashi (\IT) and the Reference transcription (\RF). Tokens containing an uncertain glyph are dropped whole; extended-EVA codes and ligature braces are kept as part of the word type. In folio order the streams hold 37,759 (\IT) / 38,463 (\RF) tokens on 225 / 227 pages, mean 168 tokens per page; 896 / 997 doubleton types and 5,527 / 6,685 hapax types. Page headers supply quire, sheet (bifolium), Currier language ($A$/$B$), section and scribal hand (Davis's five scribes). \src{1}
 
-\paragraph{Rare types.} A \emph{type} is a word type or, for the sub-word analyses, a character $n$-gram ($n=4$--8) over the space-stripped page text, with extended-EVA codes as single symbols. A type $t$ with occurrence set $O_t$ is \emph{rare} when $k_t=|O_t|\in[2,10]$; $k_t=2$ is a doubleton. The variant \emph{cross} keeps only $n$-grams that straddle a word boundary, so that they are fragments of word \emph{pairs} rather than of single rare words. \src{7}
+\paragraph{Rare types.} A \emph{type} is a word type or, for the sub-word analyses, a character $n$-gram ($n=4$--8) over the space-stripped page text, with extended-EVA codes as single symbols. A type $t$ with occurrence set $O_t$ is \emph{rare} when $k_t=|O_t|\in[2,10]$; $k_t=2$ is a doubleton. The occurrences of all rare types of a stream, whatever the unit, are its \emph{rare text}, the material every test below counts. The variant \emph{cross} keeps only $n$-grams that straddle a word boundary, so that they are fragments of word \emph{pairs} rather than of single rare words. \Cref{fig:raretext} shows both units on one line of the manuscript and where that line's rare text recurs. \src{7}
 
-\paragraph{Known texts.} Latin (Isidore, Seneca \emph{NQ}, Pliny, Macer, Gordon, Hyginus, Bacon), German (Bullinger, Staden, Promptuarium, Küchenmeisterei) and Italian (Decameron, Principe, Commedia, Orlando Furioso) texts from the project corpus, cut into windows of 37\,759 tokens and pseudo-pages of 168 tokens; for the corpus sweep, every corpus document of $\ge 37\,759$ words (148 windows: German 113, Latin 25, Italian 10). \src{1, 9}
+\begin{figure}[htbp]
+\centering
+\fig{fig_raretext}
+\caption{Rare text on one line of the manuscript (f116r, line 47, Takahashi transcription), in the manuscript's glyphs with the EVA transliteration beneath. (a)~Cut into words, the line has nine word types; the number under each is $k_t$, its count in the whole manuscript, and \emph{osain} and \emph{qorain} are rare ($2\le k_t\le10$). Cut into glyph strings, the spaces are removed and a 7-letter window starts at every letter (extended-EVA codes and each letter of a bench such as \emph{ch} are single symbols); the strip classifies all 44 windows of the line by $k_t$, and five are called out. Most windows straddle a former word gap---these are the \emph{cross} variant---so a rare glyph string is usually a fragment of a word pair and needs no theory of where a word begins or ends. (b)~Three of the line's rare glyph strings, and its rare word \emph{qorain}, occur again on f103r, the conjugate leaf of the same sheet (sheet 1 of quire T), joined to f116r at the fold and 25 pages away in the binding. Each such shared occurrence is one $\mathcal{C}$ pair in the leaf-pair test of \cref{sec:leaf}; the same strings recur on other pages too, and the test asks only whether occurrence pairs fall on conjugate leaves more often than the permutation null gives.}
+\label{fig:raretext}
+\end{figure}
+
+\paragraph{Known texts.} Latin (Isidore, Seneca \emph{NQ}, Pliny, Macer, Gordon, Hyginus, Bacon), German (Bullinger, Staden, Promptuarium, Küchenmeisterei) and Italian (Decameron, Principe, Commedia, Orlando Furioso) texts from the project corpus, cut into windows of 37,759 tokens and pseudo-pages of 168 tokens; for the corpus sweep, every corpus document of $\ge 37,759$ words (148 windows: German 113, Latin 25, Italian 10). \src{1, 9}
 
 \paragraph{Notation.} Pages are slots $p=1..P$ with contents $c_p$ (a bag of typed occurrences) and token length $L_p$. $q(p)$, $\lambda(p)$, $h(p)$, $s(p)$ and $\ell(p)$ denote quire, Currier language, hand, sheet and leaf. An \emph{occurrence pair} is $(i,j)$, $i<j$, two occurrences of the same rare type on different pages. For a page order $\sigma$, $\mathrm{pos}_\sigma(i)$ is the token index of occurrence $i$ and $d_\sigma(i,j)=|\mathrm{pos}_\sigma(i)-\mathrm{pos}_\sigma(j)|$.
 
@@ -391,13 +463,13 @@ If a text was written continuously, words and phrases that belong to one passage
 \pv=\frac{\#\{\text{null draws at least as extreme as observed}\}+1}{n_{\text{draws}}+1},
 \label{eq:pemp}
 \end{equation}
-so with 200 draws the floor is $1/201\approx 0.005$ and with 5\,000 draws $\approx 2\times10^{-4}$. A $z$ is $(\text{obs}-\bar{x}_{\text{null}})/s_{\text{null}}$; where the null's shape matters it was checked directly (\cref{sec:nullshape}).
+so with 200 draws the floor is $1/201\approx 0.005$ and with 5,000 draws $\approx 2\times10^{-4}$. A $z$ is $(\text{obs}-\bar{x}_{\text{null}})/s_{\text{null}}$; where the null's shape matters it was checked directly (\cref{sec:nullshape}).
 
 %=====================================================================
-\section{How local is the manuscript's rare material?}
+\section{How local is the manuscript's rare text?}
 \label{sec:baseline}
 
-The power of every order test is set by how tightly a text's rare types cluster in its writing order. For a type with $k$ occurrences at positions $x_1<\dots<x_k$ in a stream of $N$ tokens, the consecutive gaps $g_m=x_{m+1}-x_m$ are compared with their distribution under uniform placement of $k$ points on $N$ (exact for $k=2$; 200\,000 Monte-Carlo draws for $k\ge3$). The locality ratio at scale $G$ is
+The power of every order test is set by how tightly a text's rare types cluster in its writing order. For a type with $k$ occurrences at positions $x_1<\dots<x_k$ in a stream of $N$ tokens, the consecutive gaps $g_m=x_{m+1}-x_m$ are compared with their distribution under uniform placement of $k$ points on $N$ (exact for $k=2$; 200,000 Monte-Carlo draws for $k\ge3$). The locality ratio at scale $G$ is
 \begin{equation}
 r_G=\frac{\Pr(g\le G)}{\Pr_{\text{unif}}(g\le G)} .
 \label{eq:rG}
@@ -405,7 +477,7 @@ r_G=\frac{\Pr(g\le G)}{\Pr_{\text{unif}}(g\le G)} .
 
 \begin{table}[t]
 \centering\small
-\caption{Rare-type locality $r_{100}$ by frequency class $k$ (in brackets: percentage of types with all occurrences on one page). Manuscript rows are the whole stream; Currier $A$ and $B$ alone are 11\,k and 23--24\,k tokens. \src{2, 6.1}}
+\caption{Rare-text locality $r_{100}$ by frequency class $k$ (in brackets: percentage of types with all occurrences on one page). Manuscript rows are the whole stream; Currier $A$ and $B$ alone are 11\,k and 23--24\,k tokens. \src{2, 6.1}}
 \label{tab:locality}
 \footnotesize\setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}lcccc@{}}
@@ -436,7 +508,7 @@ This agrees with the two published scales: section-level vocabulary information 
 \begin{figure}[tbp]
 \centering
 \fig{fig_locality_baseline}
-\caption{Rare-type locality. (a)~$r_{100}$ by frequency class $k$ for the manuscript (whole stream and Currier $A$/$B$ alone) against known prose and verse (\cref{tab:locality}). (b)~Corpus sweep: 148 known 37\,759-token windows on the pooled $k\in[2,5]$ statistic, with the two manuscript transcriptions marked at their percentiles among these 148 windows (the recorded 2.5\,\% / 3.8\,\% were on the sweep log\textquoteright s 158-window count; see the footnote in the text). \src{6.1, 9}}
+\caption{Rare-text locality. (a)~$r_{100}$ by frequency class $k$ for the manuscript (whole stream and Currier $A$/$B$ alone) against known prose and verse (\cref{tab:locality}). (b)~Corpus sweep: 148 known 37,759-token windows on the pooled $k\in[2,5]$ statistic, with the two manuscript transcriptions marked at their percentiles among these 148 windows (the recorded 2.5\,\% / 3.8\,\% were on the sweep log\textquoteright s 158-window count; see the footnote in the text). \src{6.1, 9}}
 \label{fig:locality}
 \end{figure}
 
@@ -448,7 +520,7 @@ This agrees with the two published scales: section-level vocabulary information 
 
 Let $\mathcal{P}$ be the set of occurrence pairs of rare types whose two members lie on different leaves of the \emph{same quire}. Each pair is classified by the relation between its two leaves:
 \begin{itemize}
-\item[$\mathcal{C}$] conjugate: $s(i)=s(j)$, $\ell(i)\neq\ell(j)$---the two leaves of one sheet;
+\item[$\mathcal{C}$] conjugate: $s(i)=s(j)$, $\ell(i)\neq\ell(j)$---the two leaves of one sheet (one bifolium);
 \item[$\mathcal{N}$] nested-adjacent: the leaves are consecutive in the binding and $s(i)\neq s(j)$;
 \item[$\mathcal{B}$] the innermost sheet, whose two leaves are both conjugate and nested-adjacent (kept apart);
 \item[$\mathcal{O}$] every other same-quire leaf pair.
@@ -458,9 +530,9 @@ The statistic is the difference of the two discriminating counts,
 \Dstat=n_{\mathcal{C}}-n_{\mathcal{N}},\qquad n_X=\#\{(i,j)\in\mathcal{P}:\ (i,j)\in X\}.
 \label{eq:D}
 \end{equation}
-The null permutes page \emph{contents} among page \emph{slots} within groups $g(p)=(q(p),\lambda(p))$---quire and Currier language---or, for the hand control, $g(p)=(q(p),\lambda(p),h(p))$. A permutation $\pi$ moves whole pages, so every page keeps its own rare-word load and its own within-page clumping; only which physical slot a page occupies is randomised. $\Dstat_\pi$ is recomputed per draw ($2\,000$ draws; $5\,000$ for the tail study, \cref{sec:tail}), giving $z_{\Dstat}$ and \cref{eq:pemp}. Because the innermost sheet is excluded from both $\mathcal{C}$ and $\mathcal{N}$ and every quire with a single sheet contributes nothing, $\Dstat$ is driven by quires with $\ge 2$ sheets.
+The null permutes page \emph{contents} among page \emph{slots} within groups $g(p)=(q(p),\lambda(p))$---quire and Currier language---or, for the hand control, $g(p)=(q(p),\lambda(p),h(p))$. A permutation $\pi$ moves whole pages, so every page keeps its own rare-text load and its own within-page clumping; only which physical slot a page occupies is randomised. $\Dstat_\pi$ is recomputed per draw ($2,000$ draws; $5,000$ for the tail study, \cref{sec:tail}), giving $z_{\Dstat}$ and \cref{eq:pemp}. Because the innermost sheet is excluded from both $\mathcal{C}$ and $\mathcal{N}$ and every quire with a single sheet contributes nothing, $\Dstat$ is driven by quires with $\ge 2$ sheets.
 
-Under a text written in the nested order \cref{eq:nested}, passage locality lands on $\mathcal{N}$ pairs and $\Dstat<0$; under a text written in the stacked order \cref{eq:stacked} it lands on $\mathcal{C}$ pairs and $\Dstat>0$; under evenly spread rare material $\Dstat\approx0$.
+Under a text written in the nested order \cref{eq:nested}, passage locality lands on $\mathcal{N}$ pairs and $\Dstat<0$; under a text written in the stacked order \cref{eq:stacked} it lands on $\mathcal{C}$ pairs and $\Dstat>0$; under evenly spread rare text $\Dstat\approx0$.
 
 \subsection{Power controls}
 
@@ -479,8 +551,8 @@ The magnitude of $\Dstat$ under either hypothesis depends on the text's locality
 unit & pairs (\IT/\RF) & \IT & \RF & & written nested & written stacked\\
 \midrule
 words, $k=2$ & 896 / 997 & $+0.7$ & $-0.1$ & & $-1.8$ to $-4.0$\,$^\dagger$ & $+0.2$ to $+3.9$\,$^\dagger$\\
-words, $k\in[2,5]$ & 4\,839 / 5\,306 & $+2.5$ & $+1.8$ & & $-0.8$ to $-7.1$ & $+0.9$ to $+3.6$\\
-words, $k\in[2,10]$ & 13\,665 / 14\,625 & $+2.4$ & $+2.5$ & & $-2.0$ to $-7.3$ & $+1.5$ to $+4.7$\\
+words, $k\in[2,5]$ & 4,839 / 5,306 & $+2.5$ & $+1.8$ & & $-0.8$ to $-7.1$ & $+0.9$ to $+3.6$\\
+words, $k\in[2,10]$ & 13,665 / 14,625 & $+2.4$ & $+2.5$ & & $-2.0$ to $-7.3$ & $+1.5$ to $+4.7$\\
 \addlinespace
 $n$-grams $n=4$, all & 33\,k / 37\,k & $+2.6$ & $+1.2$ & & --- & ---\\
 $n=5$, all & 74\,k / 81\,k & $+3.4$ & $+2.8$ & & $-2.2$ to $-6.3$ & $+1.1$ to $+4.7$\\
@@ -540,11 +612,11 @@ $n=7$ all ; cross & $+3.9$ / $+4.1$ ; $+3.6$ / $+4.1$ & $+4.0$ / $+4.2$ ; $+3.6$
 \subsection{How often does even spreading produce the excess?}
 \label{sec:tail}
 
-The $z$ values assume nothing about the null's shape, but a tail of a few in $10^{5}$ should be counted, not extrapolated. \Cref{tab:tail} gives, for 5\,000 draws per cell, the number of null draws reaching the observed $\Dstat$ under two readings of ``evenly spread'': \emph{perm}, the page-content permutation above (the conservative reading, since page-level clumping stays in the variance), and \emph{uniform}, every occurrence of a rare type landing independently on a page of its language with probability proportional to page length. \src{12}
+The $z$ values assume nothing about the null's shape, but a tail of a few in $10^{5}$ should be counted, not extrapolated. \Cref{tab:tail} gives, for 5,000 draws per cell, the number of null draws reaching the observed $\Dstat$ under two readings of ``evenly spread'': \emph{perm}, the page-content permutation above (the conservative reading, since page-level clumping stays in the variance), and \emph{uniform}, every occurrence of a rare type landing independently on a page of its language with probability proportional to page length. \src{12}
 
 \begin{table}[t]
 \centering\small
-\caption{Empirical tail of $\Dstat$: null draws (of 5\,000) reaching the observed value, \IT\ / \RF, with the normal-tail $p$ for the recorded $z$. Under the uniform null every $n$-gram cell is 0/5\,000 ($z=+3.6$ to $+8.2$) and the word cell 10 / 0. \src{12}}
+\caption{Empirical tail of $\Dstat$: null draws (of 5,000) reaching the observed value, \IT\ / \RF, with the normal-tail $p$ for the recorded $z$. Under the uniform null every $n$-gram cell is 0/5,000 ($z=+3.6$ to $+8.2$) and the word cell 10 / 0. \src{12}}
 \label{tab:tail}
 \footnotesize\setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}lcccccc@{}}
@@ -555,34 +627,34 @@ unit ($k\in[2,10]$) & draws $\ge$ obs & $z$ & normal tail & draws $\ge$ obs & $z
 \midrule
 words & 54 / 26 & $+2.3$ / $+2.5$ & $1/90$ $\cdot$ $1/190$ & 157 / 57 & $+1.8$ / $+2.0$ & $1/30$ $\cdot$ $1/90$\\
 $n=5$ & 1 / 14 & $+3.5$ / $+2.9$ & & 2 / 2 & $+3.5$ / $+3.3$ & \\
-$n=6$ & 3 / 3 & $+3.5$ / $+3.5$ & $\approx1/1\,700$ & 5 / 1 & $+3.6$ / $+3.7$ & \\
-$n=7$ & \textbf{0 / 0} & $+4.2$ / $+4.3$ & $\approx1/70\,000$ & \textbf{0 / 0} & $+4.1$ / $+4.3$ & \\
-$n=8$ & \textbf{0 / 0} & $+4.6$ / $+5.0$ & $\approx1/500\,000$ & \textbf{0 / 0} & $+4.5$ / $+4.9$ & \\
+$n=6$ & 3 / 3 & $+3.5$ / $+3.5$ & $\approx1/1,700$ & 5 / 1 & $+3.6$ / $+3.7$ & \\
+$n=7$ & \textbf{0 / 0} & $+4.2$ / $+4.3$ & $\approx1/70,000$ & \textbf{0 / 0} & $+4.1$ / $+4.3$ & \\
+$n=8$ & \textbf{0 / 0} & $+4.6$ / $+5.0$ & $\approx1/500,000$ & \textbf{0 / 0} & $+4.5$ / $+4.9$ & \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The word-level excess alone is a 1-in-30 to 1-in-200 event under even spreading---real but not decisive, and chosen after a null result. The $n$-gram excess, the pre-stated confirmation, never occurs in 5\,000 even-spread draws at $n\ge7$ on either transcription or either null; its normal-tail chance is of order $10^{-5}$--$10^{-6}$ per cell. The cells are not independent ($n$-grams of neighbouring $n$ overlap and the two transcriptions are one text), so the family is best counted as one test per transcription at $n=7$ or 8; even a twenty-fold multiplicity correction leaves it below $1/1\,000$ (\cref{fig:tail}).
+The word-level excess alone is a 1-in-30 to 1-in-200 event under even spreading---real but not decisive, and chosen after a null result. The $n$-gram excess, the pre-stated confirmation, never occurs in 5,000 even-spread draws at $n\ge7$ on either transcription or either null; its normal-tail chance is of order $10^{-5}$--$10^{-6}$ per cell. The cells are not independent ($n$-grams of neighbouring $n$ overlap and the two transcriptions are one text), so the family is best counted as one test per transcription at $n=7$ or 8; even a twenty-fold multiplicity correction leaves it below $1/1,000$ (\cref{fig:tail}).
 
 \begin{figure}[tbp]
 \centering
 \fig[0.85\textwidth]{fig_leaf_test_tail}
-\caption{Empirical tail of the leaf-pair excess: null draws out of 5\,000 reaching the observed $\Dstat$, by unit, null and transcription; zero counts are shown explicitly. \src{12}}
+\caption{Empirical tail of the leaf-pair excess: null draws out of 5,000 reaching the observed $\Dstat$, by unit, null and transcription; zero counts are shown explicitly. \src{12}}
 \label{fig:tail}
 \end{figure}
 
 \FloatBarrier
 \begin{establishes}[unbreakable]
-Text on the two leaves of one physical sheet shares its rare material more than text on leaves that are neighbours only in the binding, and the nested neighbours share \emph{less} than random same-quire leaves. Three units (words, within-word $n$-grams, boundary-straddling $n$-grams), two transcriptions and a null holding quire, Currier language and hand fixed agree; six real texts written in the binding order never show this (36/36 cells negative) and written sheet by sheet always do (36/36 positive) at the manuscript's magnitude. Under even spreading the $n\ge7$ excess is a $\lesssim10^{-4}$ event.
+Text on the two leaves of one physical sheet shares its rare text more than text on leaves that are neighbours only in the binding, and the nested neighbours share \emph{less} than random same-quire leaves. Three units (words, within-word $n$-grams, boundary-straddling $n$-grams), two transcriptions and a null holding quire, Currier language and hand fixed agree; six real texts written in the binding order never show this (36/36 cells negative) and written sheet by sheet always do (36/36 positive) at the manuscript's magnitude. Under even spreading the $n\ge7$ excess is a $\lesssim10^{-4}$ event.
 \end{establishes}
 
 %=====================================================================
 \section{What the sheet effect is and is not}
 \label{sec:isnot}
 
-\subsection{Rare types are not contained by sheet}
+\subsection{Rare text is not contained by sheet}
 
-The sheet effect could mean that rare types are \emph{held} by one bifolium. They are not (\cref{tab:containment}, \cref{fig:containment}a). Three quarters of doubletons and over 90\,\% of the 3--5-times types span more than one quire; only 2--3\,\% of doubletons and $\approx$0--1\,\% of the rest fall within a single sheet. The \cref{sec:leaf} effect is a small excess in the roughly 20\,\% of pairs that fall within a quire (same-leaf 2.7\,\% vs 1.6\,\% expected; same-sheet 2.6\,\% vs 2.3\,\%). This is why the two re-ordering exercises below move the locality statistics so little: the material an order can act on is a fifth of the pairs. \src{11}
+The sheet effect could mean that rare types are \emph{held} by one sheet (one bifolium). They are not (\cref{tab:containment}, \cref{fig:containment}a). Three quarters of doubletons and over 90\,\% of the 3--5-times types span more than one quire; only 2--3\,\% of doubletons and $\approx$0--1\,\% of the rest fall within a single sheet. The \cref{sec:leaf} effect is a small excess in the roughly 20\,\% of pairs that fall within a quire (same-leaf 2.7\,\% vs 1.6\,\% expected; same-sheet 2.6\,\% vs 2.3\,\%). This is why the two re-ordering exercises below move the locality statistics so little: the material an order can act on is a fifth of the pairs. \src{11}
 
 \begin{table}[t]
 \centering\small
@@ -603,7 +675,7 @@ $k$ & types & same page & same leaf ($r+v$) & same sheet, both leaves & $2^{+}$ 
 
 \subsection{The stacked order does not change solver windows}
 
-The decipherment programme's word-homophonic solver has a findability wall near 4 tokens per type and had rejected windowing at 1.8--2.0 tokens/type per 1\,024-token window. Re-reading the Currier $A$ and $B$ streams in the stacked order changes tokens/type in non-overlapping windows by $\le0.01$ (under 1\,\%) at $W\le1\,024$---occasionally detectable against the within-quire page-shuffle null ($+3.2$\,sd for $A$ at $W=512$ on \IT\ and $B$ at $W=1\,024$ on \RF)---and by nothing or slightly negatively at $W\ge2\,048$; every window stays at 1.5--3.0 tokens/type with 70--80\,\% hapax types (\cref{fig:containment}b). The order result opens no solver path. \src{8}
+The decipherment programme's word-homophonic solver has a findability wall near 4 tokens per type and had rejected windowing at 1.8--2.0 tokens/type per 1,024-token window. Re-reading the Currier $A$ and $B$ streams in the stacked order changes tokens/type in non-overlapping windows by $\le0.01$ (under 1\,\%) at $W\le1,024$---occasionally detectable against the within-quire page-shuffle null ($+3.2$\,sd for $A$ at $W=512$ on \IT\ and $B$ at $W=1,024$ on \RF)---and by nothing or slightly negatively at $W\ge2,048$; every window stays at 1.5--3.0 tokens/type with 70--80\,\% hapax types (\cref{fig:containment}b). The order result opens no solver path. \src{8}
 
 \begin{figure}[tbp]
 \centering
@@ -615,7 +687,7 @@ The decipherment programme's word-homophonic solver has a findability wall near 
 \subsection{No sheet order lifts the locality above the noise ceiling}
 \label{sec:optimize}
 
-If the sheets were misarranged, a better stacking order should raise the manuscript's rare-word locality toward the corpus. Simulated annealing (20\,000 steps) over sheet orders was run on \IT\ (52 sheets, single surviving leaves counted as sheets, every sheet read stacked) with objective $J(\sigma)=\sum_{(i,j)}\exp(-d_\sigma(i,j)/1000)$ over consecutive occurrences of types with $k\in[2,5]$, under four constraint levels---\emph{strict} (swaps only within the same Currier language, section and hand; 12 groups), \emph{topic} (language + section; 10), \emph{language} (3), \emph{free}---and reported as $r_{100}$ and $r_{1000}$ (\cref{eq:rG}), whose corpus percentiles are known from \cref{sec:baseline} ($r_{1000}$: 5th percentile 1.65, 25th 2.74, median 3.35). \src{10}
+If the sheets were misarranged, a better stacking order should raise the manuscript's rare-text locality toward the corpus. Simulated annealing (20,000 steps) over sheet orders was run on \IT\ (52 sheets, single surviving leaves counted as sheets, every sheet read stacked) with objective $J(\sigma)=\sum_{(i,j)}\exp(-d_\sigma(i,j)/1000)$ over consecutive occurrences of types with $k\in[2,5]$, under four constraint levels---\emph{strict} (swaps only within the same Currier language, section and hand; 12 groups), \emph{topic} (language + section; 10), \emph{language} (3), \emph{free}---and reported as $r_{100}$ and $r_{1000}$ (\cref{eq:rG}), whose corpus percentiles are known from \cref{sec:baseline} ($r_{1000}$: 5th percentile 1.65, 25th 2.74, median 3.35). \src{10}
 
 \begin{table}[t]
 \centering\small
@@ -650,7 +722,7 @@ start & stat. & init & strict & topic & language & free\\
 \end{tabular}
 \end{table}
 
-Four readings of \cref{tab:optimize} and \cref{fig:optimize}. (i)~Re-ordering the sheets under any constraint moves $r_{1000}$ from 2.09 to 2.4--2.6, but a manuscript whose page contents were first shuffled---so that no order information exists---is moved by the same optimiser to 2.3--3.0: the whole gain is what an optimiser extracts from noise on $\sim$5\,000 rare pairs. (ii)~Random sheet orders are optimised to the same values as the actual stacked order; the current order is not a special optimum. (iii)~Known texts written sheet by sheet and shuffled are put back to their true-order value plus 0.0--0.35 of over-fitting, so the method would recover a real order if one carried locality. (iv)~Even the over-fitted manuscript values stay at the bottom of the corpus ($r_{1000}$ 2.4--2.6 is below the 25th percentile), and $r_{100}$ barely moves because gaps under 100 tokens fall inside a sheet ($\approx$670 tokens). Allowing inverted folding ($b^v,b^r,a^r,a^v$) adds $\approx+0.05$ to both the manuscript and the noise runs. Sheet order is not what separates the manuscript's rare vocabulary from prose; the separation is within the sheet. \src{10}
+Four readings of \cref{tab:optimize} and \cref{fig:optimize}. (i)~Re-ordering the sheets under any constraint moves $r_{1000}$ from 2.09 to 2.4--2.6, but a manuscript whose page contents were first shuffled---so that no order information exists---is moved by the same optimiser to 2.3--3.0: the whole gain is what an optimiser extracts from noise on $\sim$5,000 rare pairs. (ii)~Random sheet orders are optimised to the same values as the actual stacked order; the current order is not a special optimum. (iii)~Known texts written sheet by sheet and shuffled are put back to their true-order value plus 0.0--0.35 of over-fitting, so the method would recover a real order if one carried locality. (iv)~Even the over-fitted manuscript values stay at the bottom of the corpus ($r_{1000}$ 2.4--2.6 is below the 25th percentile), and $r_{100}$ barely moves because gaps under 100 tokens fall inside a sheet ($\approx$670 tokens). Allowing inverted folding ($b^v,b^r,a^r,a^v$) adds $\approx+0.05$ to both the manuscript and the noise runs. Sheet order is not what separates the manuscript's rare text from prose; the separation is within the sheet. \src{10}
 
 \begin{figure}[tbp]
 \centering
@@ -663,7 +735,7 @@ Four readings of \cref{tab:optimize} and \cref{fig:optimize}. (i)~Re-ordering th
 \section{Seriation within a quire}
 \label{sec:seriation}
 
-The leaf-pair test says the sheet is a unit. Can the rare material also say \emph{which sheet follows which}? For a quire of $S$ sheets there are $S!$ stacked orders (each sheet read $a^r,a^v,b^r,b^v$), plus the nested binding as one more candidate (\cref{sec:nesting} widens the set to every nesting pattern of the sheets). Quires that are one language, one hand and one section throughout make the cleanest test: \textbf{M} (f75--f84: 20 pages, 5 sheets, Currier $B$, hand 2, 6\,911 / 6\,969 tokens; 120 orders) and \textbf{T} (f103--f116: 23 pages, 6 sheets, Currier $B$, hand 3, 10\,673 tokens; 720 orders); the Currier-$A$ herbal quires \textbf{A} (f1--f8, 1\,495 tokens), \textbf{B} (f9--f16, three sheets and the single leaf f13, 1\,019 tokens) and \textbf{C} (f17--f24, 1\,401 tokens), hand 1, have 4 sheets and 24 orders. Sheets are numbered outer$\to$inner, so the current stacked order is \order{1-2-\ldots-S}. \src{13, 15}
+The leaf-pair test says the sheet (bifolium) is a unit. Can the rare text also say \emph{which sheet follows which}? For a quire of $S$ sheets there are $S!$ stacked orders (each sheet read $a^r,a^v,b^r,b^v$), plus the nested binding as one more candidate (\cref{sec:nesting} widens the set to every nesting pattern of the sheets). Quires that are one language, one hand and one section throughout make the cleanest test: \textbf{M} (f75--f84: 20 pages, 5 sheets, Currier $B$, hand 2, 6,911 / 6,969 tokens; 120 orders) and \textbf{T} (f103--f116: 23 pages, 6 sheets, Currier $B$, hand 3, 10,673 tokens; 720 orders); the Currier-$A$ herbal quires \textbf{A} (f1--f8, 1,495 tokens), \textbf{B} (f9--f16, three sheets and the single leaf f13, 1,019 tokens) and \textbf{C} (f17--f24, 1,401 tokens), hand 1, have 4 sheets and 24 orders. Sheets are numbered outer$\to$inner, so the current stacked order is \order{1-2-\ldots-S}. \src{13, 15}
 
 \subsection{Cost functions}
 \label{sec:costs}
@@ -672,20 +744,20 @@ Units are word types and glyph $n$-grams ($n=5$--8) with 2--10 occurrences \emph
 \begin{align}
 \text{L1:}\quad & c_{\mathrm{L1}}(\sigma)=\frac{1}{|\mathcal{P}_{\text{between}}|}\sum_{(i,j)\in\mathcal{P}_{\text{between}}} d_\sigma(i,j),
 \label{eq:L1}\\
-\text{burst:}\quad & c_{\mathrm{b}}(\sigma)=\sum_{t}\ \sum_{o\in O_t\setminus h_t}\frac{d_\sigma(o,h_t)}{\lambda_t},\qquad d_\sigma(o,h_t)=\min_{o'\in O_t\cap h_t}d_\sigma(o,o'),
-\label{eq:burst}\\
+\text{cluster:}\quad & c_{\mathrm{b}}(\sigma)=\sum_{t}\ \sum_{o\in O_t\setminus h_t}\frac{d_\sigma(o,h_t)}{\lambda_t},\qquad d_\sigma(o,h_t)=\min_{o'\in O_t\cap h_t}d_\sigma(o,o'),
+\label{eq:cluster}\\
 \text{blog:}\quad & c_{\mathrm{bl}}(\sigma)=\sum_{t}\ \sum_{o\in O_t\setminus h_t}\log\!\Bigl(1+\frac{d_\sigma(o,h_t)}{\lambda_t}\Bigr),
 \label{eq:blog}\\
 \text{modal:}\quad & c_{\mathrm{m}}(\sigma)=\sum_{t}\ w_t\sum_{o\in O_t\setminus h_t} d_\sigma(o,h_t),\qquad w_t=\frac{\max_p|O_t\cap h_t\cap p|}{|O_t\cap h_t|}.
 \label{eq:modal}
 \end{align}
-Here $h_t$ is the \emph{home sheet} of type $t$, the sheet holding most of its occurrences; types with a tie (a doubleton split 1--1) carry no intra-sheet information and are skipped. The plain mean \cref{eq:L1} gives every cross-sheet pair the same weight and a $k$-occurrence type $\sim k^2$ pairs. The burst cost \cref{eq:burst} is the negative log-likelihood of an exponential-tail burst model with one term per \emph{outlier} occurrence: a type that clusters tightly where it lives carries more positional information than one spread over its sheet. Its scale is set from the home sheet alone,
+Here $h_t$ is the \emph{home sheet} of type $t$, the sheet holding most of its occurrences; types with a tie (a doubleton split 1--1) carry no intra-sheet information and are skipped. The plain mean \cref{eq:L1} gives every cross-sheet pair the same weight and a $k$-occurrence type $\sim k^2$ pairs. The cluster cost \cref{eq:cluster} is the negative log-likelihood of an exponential-tail cluster model with one term per \emph{outlier} occurrence: a type that clusters tightly where it lives carries more positional information than one spread over its sheet. Its scale is set from the home sheet alone,
 \begin{equation}
 \lambda_t=\max\!\Bigl(30,\ \frac{\sum_{m=1}^{M_t} g_{t,m}+\lambda_0}{M_t+1}\Bigr),\qquad
 \lambda_0=\operatorname{median}_t\Bigl(\tfrac{1}{M_t}\textstyle\sum_m g_{t,m}\Bigr),
 \label{eq:lambda}
 \end{equation}
-with $g_{t,m}$ the gaps between consecutive home-sheet occurrences (shrunk toward the median over types by one pseudo-gap and floored at 30 symbols). Because within-sheet gaps are identical under every stacked order, $\lambda_t$ is the same for all candidates and no candidate can tune its own weights (\cref{fig:burstmetric}). The log form \cref{eq:blog} caps a single far outlier; the modal form \cref{eq:modal} is the discrete version of the same intuition.
+with $g_{t,m}$ the gaps between consecutive home-sheet occurrences (shrunk toward the median over types by one pseudo-gap and floored at 30 symbols). Because within-sheet gaps are identical under every stacked order, $\lambda_t$ is the same for all candidates and no candidate can tune its own weights (\cref{fig:clustermetric}). The log form \cref{eq:blog} caps a single far outlier; the modal form \cref{eq:modal} is the discrete version of the same intuition.
 
 \begin{figure}[tbp]
 \centering
@@ -710,10 +782,10 @@ with $g_{t,m}$ the gaps between consecutive home-sheet occurrences (shrunk towar
 \foreach \a/\b/\l in {0.6/1.4/1,1.4/2.6/2,2.6/3.9/3}{\draw[<->,ink2] (\a,0.95) -- (\b,0.95) node[midway,above=-1pt]{$g_{t,\l}$};}
 \draw[<->,accent!80!black,thick] (3.9,-0.3) -- (9.8,-0.3) node[midway,below]{$d_{\sigma'}(o,h_t)>d_\sigma(o,h_t)$;\quad $\lambda_t$ unchanged (same gaps $g_{t,m}$)};
 \end{scope}
-\node[anchor=west,color=ink2,align=left,text width=14.8cm] at (-0.2,-4.5) {cost contribution of type $t$ for the outlier $o$: \; burst $=d/\lambda_t$,\quad blog $=\log(1+d/\lambda_t)$,\quad modal $=w_t\,d$;\quad L1 instead averages every cross-sheet pair distance.};
+\node[anchor=west,color=ink2,align=left,text width=14.8cm] at (-0.2,-4.5) {cost contribution of type $t$ for the outlier $o$: \; cluster $=d/\lambda_t$,\quad blog $=\log(1+d/\lambda_t)$,\quad modal $=w_t\,d$;\quad L1 instead averages every cross-sheet pair distance.};
 \end{tikzpicture}
-\caption{The burst-scaled seriation cost. A rare type's home sheet holds most of its occurrences (orange); the gaps between them fix its burst scale $\lambda_t$ \cref{eq:lambda}, which is identical under every stacked order because a sheet's four pages are always contiguous. Each occurrence outside the home sheet contributes its distance to the nearest home occurrence, measured in units of $\lambda_t$ \cref{eq:burst}; the candidate order changes $d$, never $\lambda_t$.}
-\label{fig:burstmetric}
+\caption{The cluster-scaled seriation cost. A rare type's home sheet holds most of its occurrences (orange); the gaps between them fix its home gap $\lambda_t$ \cref{eq:lambda}, which is identical under every stacked order because a sheet's four pages are always contiguous. Each occurrence outside the home sheet contributes its distance to the nearest home occurrence, measured in units of $\lambda_t$ \cref{eq:cluster}; the candidate order changes $d$, never $\lambda_t$.}
+\label{fig:clustermetric}
 \end{figure}
 
 \subsection{Candidates, nulls and the best-of-$N$ heuristic}
@@ -722,12 +794,12 @@ with $g_{t,m}$ the gaps between consecutive home-sheet occurrences (shrunk towar
 For each unit and cost the candidate vector $\mathbf{c}=(c(\sigma))_{\sigma}$ over all $S!$ stacked orders is standardised within itself, $z_\sigma=(c(\sigma)-\bar c)/s_c$, and the winner is $\sigma^\ast=\arg\min_\sigma c(\sigma)$ with $z^\ast=z_{\sigma^\ast}$. Three nulls are attached to it. \src{13--15}
 \begin{itemize}
 \item \textbf{Content shuffle.} Page contents are permuted among the quire's page slots (200 draws) and the best of all candidates is recomputed each time; $p_{\text{best}}$ is the empirical fraction \cref{eq:pemp} of shuffles whose winner is at least as extreme (in $z^\ast$) as the real winner. Page-level clumping is retained by construction.
-\item \textbf{Geometry.} Page lengths stay in their slots and every occurrence of a rare type is re-placed uniformly over the quire's tokens (200 draws): does sheet \emph{size} alone favour the winning order? Valid for L1 and modal, which are means of distances; \emph{not} for burst and blog, whose $\lambda_t$ changes under uniform placement (their geometry $p$ is $\approx1$ everywhere and is discarded).
+\item \textbf{Geometry.} Page lengths stay in their slots and every occurrence of a rare type is re-placed uniformly over the quire's tokens (200 draws): does sheet \emph{size} alone favour the winning order? Valid for L1 and modal, which are means of distances; \emph{not} for cluster and blog, whose $\lambda_t$ changes under uniform placement (their geometry $p$ is $\approx1$ everywhere and is discarded).
 \item \textbf{Best-of-$N$.} The minimum of $N$ roughly normal candidate values is expected near $-\Phi^{-1}\!\bigl(1-\tfrac{1}{N+1}\bigr)$: about $-2.4$\,sd for $N=120$, $-3.0$ for 720, $-1.75$ for 24. A winner at that depth stands out from \emph{nothing}; the content-shuffle winners give the empirical version (\cref{sec:nullshape}).
 \end{itemize}
 Cross-unit consistency is the correlation of the candidate vectors of two units (e.g.\ words vs $n=7$) against the same correlation on shuffled contents, which keeps the overlap of $n$-grams with their words.
 
-\paragraph{Power.} Known prose was written onto each quire's page slots, stacked in the current or a random sheet order, or nested (three texts $\times$ three windows). On quire M's slots the true stacked order ranks 1/120 in 4--6 of 18 cases and in the top 10 in 13 under L1 (median rank 6); the burst-scaled costs lower the median rank to 2--4 (burst 3/13, blog 6/13, modal 5/13 for rank-1/top-10). Written nested, the nested order ranks 1/121 in 8 of 9. Across the five quires, rank-1 counts (L1 / blog) are 6/6 (M), 1/2 (T; median rank 10/6 among 720), 6/5 (A), 4/4 (B), 5/3 (C), with top-10 in 13--15 of 18 on the four-to-five-sheet quires and 9--13 on T. So the metric recovers a prose writing order outright about a third of the time and usually to within the top tenth; with the manuscript's locality a tenth of prose (\cref{sec:baseline}), low power there is expected (\cref{fig:power}). A \textbf{nested-written control} asks which \emph{stacked} order prose written as bound prefers (L1, nine nested-written cases per quire): the bound order \order{1-2-\ldots-S} exactly in T 2/9, M 1/9, C 5/9, A 4/9, B 5/9 cases; an order within three pairwise inversions of it in T 6/9, M 8/9, C 9/9, A 9/9, B 9/9; an order with the outermost sheet adjacent to the innermost in T 1/9, M 3/9, C 4/9, A 4/9, B 0/9. So nested writing pulls the stacked seriation toward the bound order or a near variant, and produces the outermost-next-to-innermost feature at or below its chance rate (\cref{sec:seriation-results}). \src{13, 14, 15}
+\paragraph{Power.} Known prose was written onto each quire's page slots, stacked in the current or a random sheet order, or nested (three texts $\times$ three windows). On quire M's slots the true stacked order ranks 1/120 in 4--6 of 18 cases and in the top 10 in 13 under L1 (median rank 6); the cluster-scaled costs lower the median rank to 2--4 (cluster 3/13, blog 6/13, modal 5/13 for rank-1/top-10). Written nested, the nested order ranks 1/121 in 8 of 9. Across the five quires, rank-1 counts (L1 / blog) are 6/6 (M), 1/2 (T; median rank 10/6 among 720), 6/5 (A), 4/4 (B), 5/3 (C), with top-10 in 13--15 of 18 on the four-to-five-sheet quires and 9--13 on T. So the metric recovers a prose writing order outright about a third of the time and usually to within the top tenth; with the manuscript's locality a tenth of prose (\cref{sec:baseline}), low power there is expected (\cref{fig:power}). A \textbf{nested-written control} asks which \emph{stacked} order prose written as bound prefers (L1, nine nested-written cases per quire): the bound order \order{1-2-\ldots-S} exactly in T 2/9, M 1/9, C 5/9, A 4/9, B 5/9 cases; an order within three pairwise inversions of it in T 6/9, M 8/9, C 9/9, A 9/9, B 9/9; an order with the outermost sheet adjacent to the innermost in T 1/9, M 3/9, C 4/9, A 4/9, B 0/9. So nested writing pulls the stacked seriation toward the bound order or a near variant, and produces the outermost-next-to-innermost feature at or below its chance rate (\cref{sec:seriation-results}). \src{13, 14, 15}
 
 \begin{figure}[tbp]
 \centering
@@ -752,7 +824,7 @@ Cross-unit consistency is the correlation of the candidate vectors of two units 
 \toprule
 quire (sheets, orders) & $n$-gram best order & $p_{\text{best}}$, content shuffle & $z^\ast$ within candidates & $p$, geometry & bound-order rank & words (order; $p$)\\
 \midrule
-\textbf{T} (6, 720) & \textbf{\order{1-6-5-4-2-3}}\newline 31/32 cells$^{a}$ & L1 0.005--0.02\newline blog 0.005--0.02\newline modal 0.005--0.02 & $-3.1$ to $-4.05$ & L1 0.005\newline modal 0.005--0.02 & 150--626 & \order{1-6-5-4-3-2} (\IT)\newline \order{1-6-5-4-2-3} (\RF)\newline L1 0.005; modal 0.01--0.015; burst, blog 0.36--0.74\\
+\textbf{T} (6, 720) & \textbf{\order{1-6-5-4-2-3}}\newline 31/32 cells$^{a}$ & L1 0.005--0.02\newline blog 0.005--0.02\newline modal 0.005--0.02 & $-3.1$ to $-4.05$ & L1 0.005\newline modal 0.005--0.02 & 150--626 & \order{1-6-5-4-3-2} (\IT)\newline \order{1-6-5-4-2-3} (\RF)\newline L1 0.005; modal 0.01--0.015; cluster, blog 0.36--0.74\\
 \addlinespace
 M (5, 120) & \order{2-3-5-1-4}\newline \order{3-2-5-1-4}\newline \order{4-1-2-3-5}\newline one family$^{b}$ & L1 0.005--0.07\newline blog 0.01--0.12\newline modal 0.005--0.03 & $-2.3$ to $-3.2$ & L1 0.005--0.01\newline modal 0.005--0.03 & 30--114 & \order{2-3-5-1-4}\newline 0.03--0.4\\
 \addlinespace
@@ -762,7 +834,7 @@ A (4, 24) & split$^{c}$\newline \order{1-2-4-3}\newline \order{1-4-2-3}\newline 
 \addlinespace
 B (3 sheets + leaf f13, 24) & \order{1-2-3-4}, the bound order ($n=6$--8) & L1 0.18--0.65\newline blog 0.06--0.56\newline modal 0.11--0.75 & $-1.3$ to $-2.4$ & L1 0.005--0.17\newline modal 0.005--0.68 & 1--4 & \order{1-4-3-2} and others\newline 0.1--0.8\\
 \bottomrule
-\multicolumn{7}{@{}p{16cm}@{}}{\footnotesize $^{a}$\,The single exception is \IT\ $n=5$ under L1, burst and modal, which give \order{6-1-5-4-2-3} (sheets 1 and 6 swapped at the head of the chain). $^{b}$\,One family: sheets 2 and 3 (f76/f83, f77/f82) together, then 5 (f79/f80), then 1 (f75/f84), with 4 (f78/f81) at an end; \order{4-1-2-3-5} is the same family with sheet 1 moved next to sheet 4. $^{c}$\,\order{1-2-4-3} under L1 and burst at $n=5$--7; \order{1-4-2-3} at $n=7$--8; \order{3-1-2-4} under blog and modal at $n=5$--6.}
+\multicolumn{7}{@{}p{16cm}@{}}{\footnotesize $^{a}$\,The single exception is \IT\ $n=5$ under L1, cluster and modal, which give \order{6-1-5-4-2-3} (sheets 1 and 6 swapped at the head of the chain). $^{b}$\,One family: sheets 2 and 3 (f76/f83, f77/f82) together, then 5 (f79/f80), then 1 (f75/f84), with 4 (f78/f81) at an end; \order{4-1-2-3-5} is the same family with sheet 1 moved next to sheet 4. $^{c}$\,\order{1-2-4-3} under L1 and cluster at $n=5$--7; \order{1-4-2-3} at $n=7$--8; \order{3-1-2-4} under blog and modal at $n=5$--6.}
 \end{tabular}
 \end{table}
 
@@ -792,8 +864,8 @@ B (3 sheets + leaf f13, 24) & \order{1-2-3-4}, the bound order ($n=6$--8) & L1 0
 \begin{description}
 \item[Quire T is unambiguous by this test.] Every $n$-gram length, both transcriptions and all four costs choose \order{1-6-5-4-2-3} (words: \order{1-6-5-4-3-2}); it beats shuffled contents in $\le1$ of 200 draws on every cell, beats sheet geometry likewise, sits 3--4\,sd below the candidate mean where a random minimum of the candidate set would sit near 2.9, and the current outer$\to$inner order lies in the bottom half to bottom tenth of the 720. In folios: f103/f116, f108/f111, f107/f112, f106/f113, f104/f115, f105/f114. \src{15}
 \item[Quire C replicates the shape] with a smaller quire in a different language, hand and section: \order{1-4-3-2} on 30 of 32 cells, $p$ 0.005--0.05 on most, geometry excluded. \src{15}
-\item[Quire M is consistent.] The plain mean (L1) found the best of 120 orders exactly as deep as the best of random values and a different optimum per unit \src{13}; the burst-scaled costs make the $n$-gram units agree on one family---sheets 2 and 3 (f76/f83, f77/f82) together, then 5 (f79/f80), then 1 (f75/f84), then 4 (f78/f81) at the end, or \order{4-1-2-3-5} with 1 moved next to 4---with the best-of-120 beating shuffled contents at $p$ 0.005--0.05 in 14 of 16 $n$-gram $\times$ cost $\times$ transcription cells (modal 8/8 at $\le0.035$). The words stay weak ($p$ 0.1--0.4). The between-sheet affinity matrix (shared rare pairs, observed/expected) reads the same way: sheets 1 and 5 share most (1.35--1.42 words, 1.04--1.08 at $n=7$), 2--3, 3--5 and 2--5 share 1.1--1.2, and sheet 4 shares least with everything (0.63--0.87, except 1.0 with sheet 1). \src{13, 14}
-\item[Quire A] shows sharing above shuffled contents (L1 $p$ 0.01--0.05, geometry excluded) but no single order; the current order is disfavoured. \textbf{Quire B} (three sheets and a leaf, 1\,000 tokens) prefers its current order but not above shuffled contents: no information. \src{15}
+\item[Quire M is consistent.] The plain mean (L1) found the best of 120 orders exactly as deep as the best of random values and a different optimum per unit \src{13}; the cluster-scaled costs make the $n$-gram units agree on one family---sheets 2 and 3 (f76/f83, f77/f82) together, then 5 (f79/f80), then 1 (f75/f84), then 4 (f78/f81) at the end, or \order{4-1-2-3-5} with 1 moved next to 4---with the best-of-120 beating shuffled contents at $p$ 0.005--0.05 in 14 of 16 $n$-gram $\times$ cost $\times$ transcription cells (modal 8/8 at $\le0.035$). The words stay weak ($p$ 0.1--0.4). The between-sheet affinity matrix (shared rare pairs, observed/expected) reads the same way: sheets 1 and 5 share most (1.35--1.42 words, 1.04--1.08 at $n=7$), 2--3, 3--5 and 2--5 share 1.1--1.2, and sheet 4 shares least with everything (0.63--0.87, except 1.0 with sheet 1). \src{13, 14}
+\item[Quire A] shows sharing above shuffled contents (L1 $p$ 0.01--0.05, geometry excluded) but no single order; the current order is disfavoured. \textbf{Quire B} (three sheets and a leaf, 1,000 tokens) prefers its current order but not above shuffled contents: no information. \src{15}
 \end{description}
 
 \begin{figure}[tbp]
@@ -810,30 +882,30 @@ B (3 sheets + leaf f13, 24) & \order{1-2-3-4}, the bound order ($n=6$--8) & L1 0
 \label{fig:quiresall}
 \end{figure}
 
-\paragraph{The pattern across T, C and M.} The outermost sheet sits next to the innermost sheet, and the remaining sheets then run outward in descending order: T \order{1-6-5-4-2-3} ($n$-grams; words \order{1-6-5-4-3-2}), C \order{1-4-3-2}, M \order{4-1-5-3-2} (words, $n=8$; the sheet-reversal of the \order{2-3-5-1-4} of \cref{tab:quires}, written this way round to show the pattern) with sheet 4 displaced to the front (\cref{fig:chains}). Two chance rates qualify the pattern. Under a uniformly random sheet order the outermost and innermost sheets are adjacent with probability $2/S$: $1/3$ for T ($S=6$) and $1/2$ for the four-sheet quires C and A. The feature is therefore informative for T---where nested-written prose shows it in 1 of 9 cases and the bound order is at chance---and, taken on its own, at chance for C and A; what C replicates is a specific full chain (\order{1-4-3-2} on 30 of 32 cells), not this feature. Nested-written prose does not produce the chains (its best stacked order is the bound order or a near variant, \cref{sec:nulls}), and neither sheet geometry nor page-level clustering does (the content shuffle keeps each page's own bursts). What could: composition sheet by sheet in that order; or a chain of sheet-level subject affinities that happens to run outermost $\to$ innermost $\to$ outward. The test cannot tell the two apart. \src{15}
+\paragraph{The pattern across T, C and M.} The outermost sheet sits next to the innermost sheet, and the remaining sheets then run outward in descending order: T \order{1-6-5-4-2-3} ($n$-grams; words \order{1-6-5-4-3-2}), C \order{1-4-3-2}, M \order{4-1-5-3-2} (words, $n=8$; the sheet-reversal of the \order{2-3-5-1-4} of \cref{tab:quires}, written this way round to show the pattern) with sheet 4 displaced to the front (\cref{fig:chains}). Two chance rates qualify the pattern. Under a uniformly random sheet order the outermost and innermost sheets are adjacent with probability $2/S$: $1/3$ for T ($S=6$) and $1/2$ for the four-sheet quires C and A. The feature is therefore informative for T---where nested-written prose shows it in 1 of 9 cases and the bound order is at chance---and, taken on its own, at chance for C and A; what C replicates is a specific full chain (\order{1-4-3-2} on 30 of 32 cells), not this feature. Nested-written prose does not produce the chains (its best stacked order is the bound order or a near variant, \cref{sec:nulls}), and neither sheet geometry nor page-level clustering does (the content shuffle keeps each page's own clusters). What could: composition sheet by sheet in that order; or a chain of sheet-level subject affinities that happens to run outermost $\to$ innermost $\to$ outward. The test cannot tell the two apart. \src{15}
 
 
 %=====================================================================
 \section{Other ways of gathering the sheets}
 \label{sec:nesting}
 
-\Cref{sec:leaf,sec:seriation} compared the stacked orders with one nested arrangement, the binding. Two alternatives were left open: the same sheets nested in a different order, and a quire made of two or three smaller nested gatherings laid one after another. Both would keep some conjugate leaves apart and might describe the rare-material locality as well as the stacked optimum does. Here every such pattern is a candidate. \src{19}
+\Cref{sec:leaf,sec:seriation} compared the stacked orders with one nested arrangement, the binding. Two alternatives were left open: the same sheets (bifolia) nested in a different order, and a quire made of two or three smaller nested gatherings laid one after another. Both would keep some conjugate leaves apart and might describe the rare-text locality as well as the stacked optimum does. Here every such pattern is a candidate. \src{19}
 
 \paragraph{Pattern space.} An order $\sigma$ of the $S$ sheets is cut into consecutive blocks, and each block is nested: its sheets' $a$-leaves outer$\to$inner, then their $b$-leaves inner$\to$outer. A block of one sheet is that sheet read stacked, so the fully stacked orders ($S$ blocks) and the fully nested ones (one block, the binding among them) are the two extremes of one space of
 \begin{equation}
 N_S = S!\;2^{\,S-1}
 \label{eq:patterns}
 \end{equation}
-page sequences: 192 for a four-sheet quire, 1\,920 for M, 23\,040 for T (quire B has 144 distinct sequences, because its fourth ``sheet'' is the single leaf f13 and a block that starts with it reads the same as stacking it before the block). Labels write blocks between bars with sheets outer$\to$inner inside a block: \order{1|4|3|2} is stacked, \order{1432} nested, \order{14|32} two nested pairs.
+page sequences: 192 for a four-sheet quire, 1,920 for M, 23,040 for T (quire B has 144 distinct sequences, because its fourth ``sheet'' is the single leaf f13 and a block that starts with it reads the same as stacking it before the block). Labels write blocks between bars with sheets outer$\to$inner inside a block: \order{1|4|3|2} is stacked, \order{1432} nested, \order{14|32} two nested pairs.
 
 \paragraph{Cost, and a bias to declare.} A nested block separates a sheet's two leaves, so the within-sheet distances are no longer constant across candidates and the pair set of \cref{sec:costs} cannot be reused. The cost for this question is the mean distance over \emph{all} cross-page occurrence pairs of rare types,
 \begin{equation}
 c_{\mathrm{L1}}(\pi)=\frac{1}{|P|}\sum_{(i,j)\in P} d_\pi(i,j),
 \label{eq:l1all}
 \end{equation}
-the ``stacked at all versus as bound'' setting of \cref{sec:seriation} extended to the whole space. The burst-scaled costs were also run, with a home-cluster term added (every home occurrence to its nearest other home occurrence) that charges any pattern splitting a home sheet. That family is \textbf{structurally biased toward stacked patterns} here: on shuffled contents its winner is fully stacked in 76--100\,\% of draws on the $n$-grams, because the home sheet is by definition the sheet holding most of a type's occurrences and keeping its four pages contiguous minimises the home term whatever the content; and nested-written prose is never ranked first by it in 27 controls. The L1 cost has no such bias---its shuffled-content winners fall on the block classes in proportion to class size (fully nested winners 6--7\,\% of null draws in M against $120/1\,920=6.3\,\%$ of the space; 12--17\,\% in the four-sheet quires against $24/192=12.5\,\%$) and it recovers nested writing when prose is written nested (below). So L1 is the cost for the class question and the burst family is used only as a check of the ranking within the stacked class, where it reproduces \cref{sec:seriation-results}. The null is the content shuffle of \cref{sec:nulls} (200 draws; 100 on T) with the best of all patterns recomputed each time; three statistics are compared with their own null: the winner's $p_{\text{best}}$, the \emph{gain} of the full space over the best stacked order (in candidate sd), and the \emph{margin} by which the best fully nested order trails the best stacked order, with $P(\text{chance})$ the fraction of shuffles producing a margin at least as large.
+the ``stacked at all versus as bound'' setting of \cref{sec:seriation} extended to the whole space. The cluster-scaled costs were also run, with a home-cluster term added (every home occurrence to its nearest other home occurrence) that charges any pattern splitting a home sheet. That family is \textbf{structurally biased toward stacked patterns} here: on shuffled contents its winner is fully stacked in 76--100\,\% of draws on the $n$-grams, because the home sheet is by definition the sheet holding most of a type's occurrences and keeping its four pages contiguous minimises the home term whatever the content; and nested-written prose is never ranked first by it in 27 controls. The L1 cost has no such bias---its shuffled-content winners fall on the block classes in proportion to class size (fully nested winners 6--7\,\% of null draws in M against $120/1,920=6.3\,\%$ of the space; 12--17\,\% in the four-sheet quires against $24/192=12.5\,\%$) and it recovers nested writing when prose is written nested (below). So L1 is the cost for the class question and the cluster family is used only as a check of the ranking within the stacked class, where it reproduces \cref{sec:seriation-results}. The null is the content shuffle of \cref{sec:nulls} (200 draws; 100 on T) with the best of all patterns recomputed each time; three statistics are compared with their own null: the winner's $p_{\text{best}}$, the \emph{gain} of the full space over the best stacked order (in candidate sd), and the \emph{margin} by which the best fully nested order trails the best stacked order, with $P(\text{chance})$ the fraction of shuffles producing a margin at least as large.
 
-\paragraph{Power.} Known prose written onto each quire's page slots (three texts $\times$ three windows, words, L1). Written as bound, the binding ranks 1 of 192 in 2/9 (C), 1/9 (A) and 3/9 (B) cases, 0/9 of 1\,920 (M) and 1/9 of 23\,040 (T); written nested in a random sheet order, that order ranks 1 in 4/9, 0/9, 2/9, 0/9, 1/9; a random two-block pattern 1/9, 0/9, 1/9, 1/9, 1/9; a random stacked order 1/9, 1/9, 0/9, 1/9, 1/9. Median ranks are 9--27 in every mode (T's stacked-random 134 of 23\,040). The cost identifies the writing \emph{pattern} about as well as it identified the writing \emph{order} in \cref{sec:nulls}, with no preference among the four kinds: prose written nested is won by a nested pattern, prose written stacked by a stacked one. \src{19}
+\paragraph{Power.} Known prose written onto each quire's page slots (three texts $\times$ three windows, words, L1). Written as bound, the binding ranks 1 of 192 in 2/9 (C), 1/9 (A) and 3/9 (B) cases, 0/9 of 1,920 (M) and 1/9 of 23,040 (T); written nested in a random sheet order, that order ranks 1 in 4/9, 0/9, 2/9, 0/9, 1/9; a random two-block pattern 1/9, 0/9, 1/9, 1/9, 1/9; a random stacked order 1/9, 1/9, 0/9, 1/9, 1/9. Median ranks are 9--27 in every mode (T's stacked-random 134 of 23,040). The cost identifies the writing \emph{pattern} about as well as it identified the writing \emph{order} in \cref{sec:nulls}, with no preference among the four kinds: prose written nested is won by a nested pattern, prose written stacked by a stacked one. \src{19}
 
 \begin{table}[tbp]
 \centering\footnotesize
@@ -851,10 +923,10 @@ B (4, 144) & \IT & 2/4/4/4/4 & 0.00--0.79 (0.33--1.00) & 1--8 & 3--90 & 3--125 &
  & \RF & 2/4/4/4/4 & 0.00--0.69 (0.40--1.00) & 1--12 & 5--88 & 5--124 & $-$0.3 to +2.9 (0.00--0.74)\\
 C (4, 192) & \IT & 3/3/4/4/4 & 0.00--0.32 (0.71--1.00) & 1--3 & 17--100 & 17--123 & +1.0 to +1.9 (0.05--0.16)\\
  & \RF & 3/3/4/4/4 & 0.00--0.02 (0.92--1.00) & 1--2 & 19--106 & 19--145 & +1.0 to +2.2 (0.03--0.23)\\
-M (5, 1\,920) & \IT & 4/4/4/4/5 & 0.00--0.38 (0.71--1.00) & 1--13 & 650--818 & 1\,404--1\,862 & +2.3 to +2.6 (0.00--0.07)\\
- & \RF & 5/4/3/4/5 & 0.00--0.41 (0.72--1.00) & 1--24 & 177--881 & 1\,569--1\,887 & +1.5 to +2.7 (0.03--0.10)\\
-T (6, 23\,040) & \IT & 4/6/6/6/6 & 0.00--0.18 (0.90--1.00) & 1--5 & 1\,750--10\,535 & 13\,942--22\,405 & +1.9 to +4.7 (0.01--0.05)\\
- & \RF & 5/6/6/6/6 & 0.00--0.16 (0.95--1.00) & 1--2 & 3\,588--8\,434 & 16\,868--21\,492 & +3.0 to +4.6 (0.01--0.02)\\
+M (5, 1,920) & \IT & 4/4/4/4/5 & 0.00--0.38 (0.71--1.00) & 1--13 & 650--818 & 1,404--1,862 & +2.3 to +2.6 (0.00--0.07)\\
+ & \RF & 5/4/3/4/5 & 0.00--0.41 (0.72--1.00) & 1--24 & 177--881 & 1,569--1,887 & +1.5 to +2.7 (0.03--0.10)\\
+T (6, 23,040) & \IT & 4/6/6/6/6 & 0.00--0.18 (0.90--1.00) & 1--5 & 1,750--10,535 & 13,942--22,405 & +1.9 to +4.7 (0.01--0.05)\\
+ & \RF & 5/6/6/6/6 & 0.00--0.16 (0.95--1.00) & 1--2 & 3,588--8,434 & 16,868--21,492 & +3.0 to +4.6 (0.01--0.02)\\
 \bottomrule
 \end{tabular}}
 \end{table}
@@ -866,16 +938,23 @@ T (6, 23\,040) & \IT & 4/6/6/6/6 & 0.00--0.18 (0.90--1.00) & 1--5 & 1\,750--10\,
 \label{fig:nesting}
 \end{figure}
 
-\paragraph{Results.} \Cref{tab:nesting,fig:nesting}. \textbf{Quire T (23\,040 patterns) is the decisive case.} A fully stacked order wins the whole space on every $n$-gram unit and both transcriptions---\order{3|2|4|5|6|1}, the un-folded optimum of \cref{sec:direction}, on seven of the eight cells and \order{3|2|4|5|1|6} on the eighth (\IT, $n=5$)---at $p_{\text{best}}=0.01$ against the shuffled winner. On the $n$-grams the best fully nested order ranks 5\,007--10\,535 (\IT) and 6\,146--8\,434 (\RF), the binding 19\,180--22\,405 and 17\,902--21\,492, and the nested class trails the stacked optimum by 3.4--4.7\,sd where shuffled contents give +0.7 to +0.9 ($P(\text{chance})=0.01$ on all eight $n$-gram cells, 0.02--0.05 on words). Nothing in the full space improves on the best stacked order: the shuffled winner typically beats its own best stacked order by 0.9--1.2\,sd through the wider search, the manuscript's by 0.00 on the $n$-grams and 0.16--0.18 on words ($p$ 0.90--0.95). In every quire and both transcriptions the overall winner is fully stacked or a pattern with one nested pair among otherwise stacked sheets (A's \order{1|42|3}, M's \order{14|5|2|3}, C's \order{2|13|4} on words), and where it is not fully stacked it beats the best stacked order by 0.02--0.4\,sd, exactly what the enlarged search gains on shuffled contents ($p$ 0.7--1.0 in every $n$-gram cell; the only values below 0.5 are quire B's words, a null cell where nothing is significant, $p_{\text{best}}$ 0.4--0.7). No fully nested order comes close: the best of them ranks 14--106 of 192 in the herbal quires (B's words excepted), 177--881 of 1\,920 in M and 5\,007--10\,535 of 23\,040 in T, and the binding ranks lower still. The nested class trails the stacked optimum by 1--3\,sd in the smaller quires, which shuffled contents reproduce in 3--15\,\% of draws on most $n$-gram cells (M \IT{} 0.005--0.07, C 0.03--0.23, A 0.09--0.36). Two-block patterns---the natural ``two smaller gatherings'' reading---never win on an $n$-gram unit anywhere. \src{19}
+\begin{figure}[tbp]
+\centering
+\fig{fig_nesting_classes}
+\caption{Every nesting pattern of quire T's six sheets by class, L1 cost on $n=7$ glyph strings standardised over all 23,040 patterns (closer fit upward), one box per number of nested blocks: mean $\pm$ 1 sd, mean line, whiskers the worst and best pattern of the class. The binding and the best stacked order (the best of the whole space; dashed line) are marked. The fully nested class is tight and wholly on the worse side of the mean (its best member $+0.08$ sd \IT{}, $-0.37$ \RF{}); the stacked class is centred better but broad (mean $-0.4$ sd, sd 1.07), so the classes overlap and a random stacked order beats a random nested one in 95\,\% (\IT) and 90\,\% (\RF) of pairs; mean and best member improve monotonically with the number of blocks, and the best mixed patterns (4--5 blocks, one or two sheets nested) come within 0.1--0.5 sd of the stacked optimum. \src{19}}
+\label{fig:nesting-classes}
+\end{figure}
 
-\paragraph{Reading.} The comparison of \cref{sec:leaf,sec:seriation} was not a straw man. What the rare material rewards is the property every stacked order shares, a sheet's four pages together, and no other way of gathering the same sheets---reordered nesting, two or three nested sub-gatherings, or a mixed pattern---recovers it. Within the stacked class the T chain of \cref{sec:seriation-results} stands as recorded (adjacency only; direction in \cref{sec:direction}). Two limits. The burst-family costs cannot be used for the class question at all (the bias above), so this section rests on L1 alone. And the space does not contain inverted folding combined with nesting, which nobody has proposed; a nested pattern whose leaves coincide with the stacked adjacency is already in it, since a sheet nested inside a one-sheet block is that sheet stacked. \src{19}
+\paragraph{Results.} \Cref{tab:nesting,fig:nesting,fig:nesting-classes}. \textbf{Quire T (23,040 patterns) is the decisive case.} A fully stacked order wins the whole space on every $n$-gram unit and both transcriptions---\order{3|2|4|5|6|1}, the un-folded optimum of \cref{sec:direction}, on seven of the eight cells and \order{3|2|4|5|1|6} on the eighth (\IT, $n=5$)---at $p_{\text{best}}=0.01$ against the shuffled winner. On the $n$-grams the best fully nested order ranks 5,007--10,535 (\IT) and 6,146--8,434 (\RF), the binding 19,180--22,405 and 17,902--21,492, and the nested class trails the stacked optimum by 3.4--4.7\,sd where shuffled contents give +0.7 to +0.9 ($P(\text{chance})=0.01$ on all eight $n$-gram cells, 0.02--0.05 on words). Nothing in the full space improves on the best stacked order: the shuffled winner typically beats its own best stacked order by 0.9--1.2\,sd through the wider search, the manuscript's by 0.00 on the $n$-grams and 0.16--0.18 on words ($p$ 0.90--0.95). In every quire and both transcriptions the overall winner is fully stacked or a pattern with one nested pair among otherwise stacked sheets (A's \order{1|42|3}, M's \order{14|5|2|3}, C's \order{2|13|4} on words), and where it is not fully stacked it beats the best stacked order by 0.02--0.4\,sd, exactly what the enlarged search gains on shuffled contents ($p$ 0.7--1.0 in every $n$-gram cell; the only values below 0.5 are quire B's words, a null cell where nothing is significant, $p_{\text{best}}$ 0.4--0.7). No fully nested order comes close: the best of them ranks 14--106 of 192 in the herbal quires (B's words excepted), 177--881 of 1,920 in M and 5,007--10,535 of 23,040 in T, and the binding ranks lower still. The nested class trails the stacked optimum by 1--3\,sd in the smaller quires, which shuffled contents reproduce in 3--15\,\% of draws on most $n$-gram cells (M \IT{} 0.005--0.07, C 0.03--0.23, A 0.09--0.36). Two-block patterns---the natural ``two smaller gatherings'' reading---never win on an $n$-gram unit anywhere. \src{19}
+
+\paragraph{Reading.} The comparison of \cref{sec:leaf,sec:seriation} was not a straw man. What the rare text rewards is the property every stacked order shares, a sheet's four pages together, and no other way of gathering the same sheets---reordered nesting, two or three nested sub-gatherings, or a mixed pattern---recovers it. Within the stacked class the T chain of \cref{sec:seriation-results} stands as recorded (adjacency only; direction in \cref{sec:direction}). Two limits. The cluster-family costs cannot be used for the class question at all (the bias above), so this section rests on L1 alone. And the space does not contain inverted folding combined with nesting, which nobody has proposed; a nested pattern whose leaves coincide with the stacked adjacency is already in it, since a sheet nested inside a one-sheet block is that sheet stacked. \src{19}
 
 \section{Direction}
 \label{sec:direction}
 
 \subsection{An order and its sheet-reversal are not equivalent}
 
-When the seriation results were first recorded, an order and its sheet-reversal were treated as equivalent and each best order reported as the smaller label of the pair. That is wrong: reversing the sheet order does not reverse the page sequence, because every sheet is still read $a^r,a^v,b^r,b^v$. For a type with an occurrence at within-sheet position $x$ in sheet $A$ (length $L_A$) and one at $y$ in sheet $B$ (length $L_B$),
+When the seriation results were first recorded, an order and its sheet-reversal were treated as equivalent and each best order reported as the smaller label of the pair. That is wrong: reversing the order of the sheets (bifolia) does not reverse the page sequence, because every sheet is still read $a^r,a^v,b^r,b^v$. For a type with an occurrence at within-sheet position $x$ in sheet $A$ (length $L_A$) and one at $y$ in sheet $B$ (length $L_B$),
 \begin{equation}
 d_{AB}=(L_A-x)+y,\qquad d_{BA}=(L_B-y)+x,\qquad d_{AB}-d_{BA}=(L_A-L_B)-2(x-y),
 \label{eq:direction}
@@ -900,7 +979,7 @@ are computed. Because \emph{any} winner beats its reversal by construction, the 
 \toprule
 quire & un-folded best ($n=5$--8, both transcriptions; L1 $\cdot$ blog $\cdot$ modal) & reversal's rank & $\Delta$ (sd) & null $\Delta$ (sd) & $p$\\
 \midrule
-T & \textbf{\order{3-2-4-5-6-1}} in 22 of 24 L1$\cdot$blog$\cdot$modal cells (29 of 32 including burst); exceptions \IT\ $n=5$ L1/burst/modal \order{3-2-4-5-1-6}; words \order{2-3-4-5-6-1} / \order{3-2-4-5-6-1} & 5--27 / 720 & 0.6--1.7 & 0.8--1.4 $\pm$ 0.5--0.7 & 0.20--0.80\\
+T & \textbf{\order{3-2-4-5-6-1}} in 22 of 24 L1$\cdot$blog$\cdot$modal cells (29 of 32 including cluster); exceptions \IT\ $n=5$ L1/cluster/modal \order{3-2-4-5-1-6}; words \order{2-3-4-5-6-1} / \order{3-2-4-5-6-1} & 5--27 / 720 & 0.6--1.7 & 0.8--1.4 $\pm$ 0.5--0.7 & 0.20--0.80\\
 \addlinespace
 M & inconsistent: \order{2-3-5-1-4}, \order{4-1-5-2-3}, \order{1-4-5-2-3}, \order{1-4-2-3-5}, \order{4-1-2-3-5} & 2--35 / 120 & 0.1--2.1 & 0.8--1.5 & 0.07--0.98\\
 \addlinespace
@@ -911,19 +990,19 @@ B & \order{1-2-3-4} and \order{4-3-2-1} both appear & 2--9 / 24 & 0.0--1.5 & 1.0
 \end{tabular}
 \end{table}
 
-No quire's direction is established (\cref{tab:direction}, \cref{fig:direction}a): every gap between the best order and its reversal is the size that selecting the best of the candidate set produces on shuffled contents ($p\ge0.07$, mostly $\ge0.3$). Quire T's direction is at least \emph{consistent}---\order{3-2-4-5-6-1} in 22 of 24 L1$\cdot$blog$\cdot$modal cells (29 of 32 with burst; the exceptions are the \IT\ $n=5$ cells, \order{3-2-4-5-1-6}), i.e.\ f105/f114, f104/f115, f106/f113, f107/f112, f108/f111 and the outermost f103/f116 \emph{last}---but the cells are correlated and the gap is ordinary; and ``the outermost sheet holds the end'' is also where a text written as bound ends (f116). \src{16}
+No quire's direction is established (\cref{tab:direction}, \cref{fig:direction}a): every gap between the best order and its reversal is the size that selecting the best of the candidate set produces on shuffled contents ($p\ge0.07$, mostly $\ge0.3$). Quire T's direction is at least \emph{consistent}---\order{3-2-4-5-6-1} in 22 of 24 L1$\cdot$blog$\cdot$modal cells (29 of 32 with cluster; the exceptions are the \IT\ $n=5$ cells, \order{3-2-4-5-1-6}), i.e.\ f105/f114, f104/f115, f106/f113, f107/f112, f108/f111 and the outermost f103/f116 \emph{last}---but the cells are correlated and the gap is ordinary; and ``the outermost sheet holds the end'' is also where a text written as bound ends (f116). \src{16}
 
-\subsection{Is there a time arrow inside a burst?}
+\subsection{Is there a time arrow inside a cluster?}
 \label{sec:frontloading}
 
-The only route to direction that does not depend on the sliver of within-sheet position in \cref{eq:direction} would be burst \emph{shape}: if a rare type is introduced, reused quickly and tails off, a burst straddling a sheet boundary tells from its shape which sheet came first. For every type with 3--10 occurrences inside one segment, two statistics were taken: the fraction of types whose first inter-occurrence gap is shorter than the last (front-loaded $\Rightarrow>0.5$; sign test) and the skew $(\bar x-\tfrac{x_1+x_k}{2})/(x_k-x_1)$ (front-loaded $\Rightarrow<0$; $t$-test). Segments were 1\,500-token windows of six known texts (words and character 5--8-grams), the manuscript's 50 sheets of $\ge3$ pages read $a^r,a^v,b^r,b^v$ (direction known, no order search), by Currier language, and its pages; the control puts the four pages of every four-page sheet in random order (200 draws), keeping every page-level effect and destroying only the reading order. \src{18}
+The only route to direction that does not depend on the sliver of within-sheet position in \cref{eq:direction} would be cluster \emph{shape}: if a rare type is introduced, reused quickly and tails off, a cluster straddling a sheet boundary tells from its shape which sheet came first. For every type with 3--10 occurrences inside one segment, two statistics were taken: the fraction of types whose first inter-occurrence gap is shorter than the last (front-loaded $\Rightarrow>0.5$; sign test) and the skew $(\bar x-\tfrac{x_1+x_k}{2})/(x_k-x_1)$ (front-loaded $\Rightarrow<0$; $t$-test). Segments were 1,500-token windows of six known texts (words and character 5--8-grams), the manuscript's 50 sheets of $\ge3$ pages read $a^r,a^v,b^r,b^v$ (direction known, no order search), by Currier language, and its pages; the control puts the four pages of every four-page sheet in random order (200 draws), keeping every page-level effect and destroying only the reading order. \src{18}
 
-\textbf{Prose has no usable arrow.} Pooled over six texts, the first$<$last fraction is 0.503 for words ($n=19\,551$) and 0.502--0.508 for $n$-grams, skew $-0.0004$ to $-0.0011$; by text the fraction ranges 0.48--0.53 with both signs. The only trace is in long $n$-grams with $\ge5$ occurrences (0.52--0.55), a few per cent. A burst is, to within a per cent, symmetric in time, so the premise fails and the shape of a straddling burst cannot give direction anywhere. The manuscript is symmetric too (all sheets pooled 0.49--0.51; pages 0.48--0.51; Currier $B$ sheets 0.49--0.50, permutation $p$ 0.17--0.61). The one asymmetry---Currier $A$ herbal sheets, $n$-grams only, back-loaded at 0.44--0.47, driven by $k=3$ types, $p$ 0.005--0.1 against the within-sheet page permutation on six correlated cells, both transcriptions---is not the mirror of any prose property (prose $k=3$ is 0.50 exactly) and so is not evidence that $A$ sheets are read backwards; its shape is what a \emph{leaf-level} difference would produce (the two pages of leaf $b$ sharing rare $n$-grams more than the two pages of leaf $a$), a layout or production question given that herbal $a^r$ pages carry the large drawings. Page length in $A$ sheets falls $104\to95\to87\to82$ tokens by position, but the permutation null carries lengths with the pages and still gives 0.50. \src{18}
+\textbf{Prose has no usable arrow.} Pooled over six texts, the first$<$last fraction is 0.503 for words ($n=19,551$) and 0.502--0.508 for $n$-grams, skew $-0.0004$ to $-0.0011$; by text the fraction ranges 0.48--0.53 with both signs. The only trace is in long $n$-grams with $\ge5$ occurrences (0.52--0.55), a few per cent. A cluster is, to within a per cent, symmetric in time, so the premise fails and the shape of a straddling cluster cannot give direction anywhere. The manuscript is symmetric too (all sheets pooled 0.49--0.51; pages 0.48--0.51; Currier $B$ sheets 0.49--0.50, permutation $p$ 0.17--0.61). The one asymmetry---Currier $A$ herbal sheets, $n$-grams only, back-loaded at 0.44--0.47, driven by $k=3$ types, $p$ 0.005--0.1 against the within-sheet page permutation on six correlated cells, both transcriptions---is not the mirror of any prose property (prose $k=3$ is 0.50 exactly) and so is not evidence that $A$ sheets are read backwards; its shape is what a \emph{leaf-level} difference would produce (the two pages of leaf $b$ sharing rare $n$-grams more than the two pages of leaf $a$), a layout or production question given that herbal $a^r$ pages carry the large drawings. Page length in $A$ sheets falls $104\to95\to87\to82$ tokens by position, but the permutation null carries lengths with the pages and still gives 0.50. \src{18}
 
 \begin{figure}[tbp]
 \centering
 \fig{fig_direction}
-\caption{Direction. (a)~Gap $\Delta$ between the winning order and its sheet-reversal (in candidate sd) against the selection-matched null from shuffled contents, per quire and unit. (b)~Burst front-loading: fraction of rare types whose first gap is shorter than the last, for known texts and for the manuscript's sheets and pages; 0.5 is symmetry. The two grey bands are the range of the pooled prose value over the five units and the range of the six individual prose texts. \src{16--18}}
+\caption{Direction. (a)~Gap $\Delta$ between the winning order and its sheet-reversal (in candidate sd) against the selection-matched null from shuffled contents, per quire and unit. (b)~Cluster front-loading: fraction of rare types whose first gap is shorter than the last, for known texts and for the manuscript's sheets and pages; 0.5 is symmetry. The two grey bands are the range of the pooled prose value over the five units and the range of the six individual prose texts. \src{16--18}}
 \label{fig:direction}
 \end{figure}
 
@@ -945,25 +1024,25 @@ Nothing in \cref{sec:seriation,sec:direction} rests on normality: the candidate 
 
 \begin{establishes}
 \begin{enumerate}
-\item The manuscript's rare vocabulary has about one tenth of the passage-scale locality of prose and clusters like rhymed verse at every frequency class $k=2$--5 and in both Currier languages (\cref{sec:baseline}).
-\item Despite that, the sheet is a unit that shares rare material: conjugate leaves share more, nested neighbours share less, on words and on glyph $n$-grams, on both transcriptions, with quire, language and hand held fixed (\cref{sec:leaf}). Six real texts reproduce the sign and size only when written sheet by sheet (36/36 vs 36/36). No other way of gathering the same sheets does as well: over every reordered, sub-gathered and mixed nesting of a quire's sheets (up to 23\,040 patterns) nothing beats the best stacked order beyond what the wider search gains on shuffled contents, the best fully nested order ranks 5\,007--10\,535 of 23\,040 in T, and the binding lower still (\cref{sec:nesting}).
-\item The effect is small in mass---rare types are not contained by sheet, solver windows are unchanged, no sheet order lifts the locality above the noise ceiling (\cref{sec:isnot})---and lives in the $\sim$20\,\% of pairs that fall within a quire.
-\item Within a quire the burst-scaled seriation selects a sheet chain in T (\order{1-6-5-4-2-3}, 31/32 cells, $p\le0.02$ against shuffled contents and geometry), replicates the shape in C (\order{1-4-3-2}) and is consistent in M; in each the outermost sheet neighbours the innermost---informative for T (chance rate $2/S=1/3$; nested-written prose 1/9), at chance ($1/2$) for the four-sheet quires on its own, so C's contribution is the full chain rather than this feature (\cref{sec:seriation}).
+\item The manuscript's rare text has about one tenth of the passage-scale locality of prose and clusters like rhymed verse at every frequency class $k=2$--5 and in both Currier languages (\cref{sec:baseline}).
+\item Despite that, the sheet (bifolium) is a unit that shares rare text: conjugate leaves share more, nested neighbours share less, on words and on glyph $n$-grams, on both transcriptions, with quire, language and hand held fixed (\cref{sec:leaf}). Six real texts reproduce the sign and size only when written sheet by sheet (36/36 vs 36/36). No other way of gathering the same sheets does as well: over every reordered, sub-gathered and mixed nesting of a quire's sheets (up to 23,040 patterns) nothing beats the best stacked order beyond what the wider search gains on shuffled contents, the best fully nested order ranks 5,007--10,535 of 23,040 in T, and the binding lower still (\cref{sec:nesting}).
+\item The effect is small in mass---rare text is not contained by sheet, solver windows are unchanged, no sheet order lifts the locality above the noise ceiling (\cref{sec:isnot})---and lives in the $\sim$20\,\% of pairs that fall within a quire.
+\item Within a quire the cluster-scaled seriation selects a sheet chain in T (\order{1-6-5-4-2-3}, 31/32 cells, $p\le0.02$ against shuffled contents and geometry), replicates the shape in C (\order{1-4-3-2}) and is consistent in M; in each the outermost sheet neighbours the innermost---informative for T (chance rate $2/S=1/3$; nested-written prose 1/9), at chance ($1/2$) for the four-sheet quires on its own, so C's contribution is the full chain rather than this feature (\cref{sec:seriation}).
 \end{enumerate}
 \end{establishes}
 
 \begin{notestablished}
 \begin{enumerate}
-\item \textbf{Composition unit versus work unit.} Every statistic here responds equally to ``the text flows $a^r\to a^v\to b^r\to b^v$ across the sheet'' and to ``one scribe, one session, one topic per sheet, with the intended reading order still nested''. The hands running by sheet (97\,\% of conjugate pairs same hand) is itself evidence that the sheet was a working unit. A rare-material statistic cannot separate the two; that is what Davis's stacked proposal and a sheet-level production account share.
-\item \textbf{Direction.} The sense of reading along any chain is not established (\cref{sec:direction}): the gap to the reversal is what selection produces on noise, and prose bursts are symmetric to within a per cent, so there is no arrow to calibrate on.
+\item \textbf{Composition unit versus work unit.} Every statistic here responds equally to ``the text flows $a^r\to a^v\to b^r\to b^v$ across the sheet'' and to ``one scribe, one session, one topic per sheet, with the intended reading order still nested''. The hands running by sheet (97\,\% of conjugate pairs same hand) is itself evidence that the sheet was a working unit. A rare-text statistic cannot separate the two; that is what Davis's stacked proposal and a sheet-level production account share.
+\item \textbf{Direction.} The sense of reading along any chain is not established (\cref{sec:direction}): the gap to the reversal is what selection produces on noise, and prose clusters are symmetric to within a per cent, so there is no arrow to calibrate on.
 \item \textbf{Which sheets or quires are misplaced.} The per-quire word-level picture is uneven (signal in A, T, H, M; none in herbal B--G); quires D--G (mixed language/hand), O, Q and S were not seriated; the codicological literature's specific reorderings were not tested as fixed candidates; T's chain has not been checked against the codicology (f103/f116 is the sheet with the missing f116v text).
 \item \textbf{A stacking that recovers prose-like locality.} None exists: the separation from prose is within the sheet (\cref{sec:optimize}).
 \end{enumerate}
 \end{notestablished}
 
-\paragraph{Sequential testing and correlated cells.} The evidential order matters. The doubleton test was null; the pooled-word statistic was chosen after seeing it ($p\approx0.01$, not pre-registered); the $n$-gram test was then run as the pre-stated check and is the number to quote ($z=+3$ to $+5$, 0/5\,000 even-spread draws at $n\ge7$, hand-controlled). Within every table the cells are correlated: $n$-grams of neighbouring $n$ overlap, the two transcriptions are one text, the three burst-scaled costs share their outliers, the nesting-pattern cells of \cref{sec:nesting} share their candidates with the stacked seriation, and the herbal quires' candidate sets are tiny (24 orders), so their $p$-values are coarse. Quire T's seriation is the result to quote; C is a replication in a different language, hand and section; M is consistent; A and B are uninformative.
+\paragraph{Sequential testing and correlated cells.} The evidential order matters. The doubleton test was null; the pooled-word statistic was chosen after seeing it ($p\approx0.01$, not pre-registered); the $n$-gram test was then run as the pre-stated check and is the number to quote ($z=+3$ to $+5$, 0/5,000 even-spread draws at $n\ge7$, hand-controlled). Within every table the cells are correlated: $n$-grams of neighbouring $n$ overlap, the two transcriptions are one text, the three cluster-scaled costs share their outliers, the nesting-pattern cells of \cref{sec:nesting} share their candidates with the stacked seriation, and the herbal quires' candidate sets are tiny (24 orders), so their $p$-values are coarse. Quire T's seriation is the result to quote; C is a replication in a different language, hand and section; M is consistent; A and B are uninformative.
 
-\paragraph{What would settle it.} (i)~An independent quire-internal signal reaching the same optimum---the words alone at $p<0.05$ in T or M, or a whole-vocabulary leaf similarity with language and section controlled. (ii)~The specific reorderings proposed in the codicological literature run as fixed candidates against the within-quire null, instead of a search over all $S!$. (iii)~The remaining multi-sheet quires. (iv)~A production-side test of the composition-vs-work distinction that does not use text position at all (ink, ruling, drawing sequence). (v)~For the Currier-$A$ $n$-gram back-loading, the one follow-up worth running before any interpretation: within-leaf sharing, leaf $a$ versus leaf $b$, on the herbal quires. (vi)~The latent-semantic-analysis test Davis reported (\cref{sec:question}), should it be published: a page-level topic similarity is the natural complement to a rare-type position statistic, and agreement or disagreement on the sign of the conjugate-versus-nested contrast would be informative either way. None of this needs the GPU; every run here is seconds to minutes on CPU.
+\paragraph{What would settle it.} (i)~An independent quire-internal signal reaching the same optimum---the words alone at $p<0.05$ in T or M, or a whole-vocabulary leaf similarity with language and section controlled. (ii)~The specific reorderings proposed in the codicological literature run as fixed candidates against the within-quire null, instead of a search over all $S!$. (iii)~The remaining multi-sheet quires. (iv)~A production-side test of the composition-vs-work distinction that does not use text position at all (ink, ruling, drawing sequence). (v)~For the Currier-$A$ $n$-gram back-loading, the one follow-up worth running before any interpretation: within-leaf sharing, leaf $a$ versus leaf $b$, on the herbal quires. (vi)~The latent-semantic-analysis test Davis reported (\cref{sec:question}), should it be published: a page-level topic similarity is the natural complement to a rare-text position statistic, and agreement or disagreement on the sign of the conjugate-versus-nested contrast would be informative either way. None of this needs the GPU; every run here is seconds to minutes on CPU.
 
 %=====================================================================
 \appendix
@@ -1000,14 +1079,14 @@ script & artifacts (\texttt{data/}) & report section (record \S)\\
 \end{tabular}
 \end{table}
 
-\paragraph{Conventions.} Reference null 1 (uniform pairs) is exact for $k=2$ and Monte-Carlo (200\,000 draws) for $k\ge3$. Page-order shuffles: 1\,000 for the page-order statistics (200 per known-text window), 2\,000 for the leaf test, 500 for the $n$-gram controls (1\,000 for the hand control and the pooled-word controls), 5\,000 for the tail study, 200 for every seriation, direction and null-shape run. The optimiser of \cref{sec:optimize} is simulated annealing, 20\,000 steps; a first run that allowed a physically impossible leaf swap gave the same numbers and is superseded by \texttt{order\_optimize\_none.json}. The first quire-M proof-of-concept log with a wrong null mask (\texttt{quire\_order\_poc\_M\_maskbug.log}) is superseded by \texttt{quire\_order\_poc\_M.log}.
+\paragraph{Conventions.} Reference null 1 (uniform pairs) is exact for $k=2$ and Monte-Carlo (200,000 draws) for $k\ge3$. Page-order shuffles: 1,000 for the page-order statistics (200 per known-text window), 2,000 for the leaf test, 500 for the $n$-gram controls (1,000 for the hand control and the pooled-word controls), 5,000 for the tail study, 200 for every seriation, direction and null-shape run. The optimiser of \cref{sec:optimize} is simulated annealing, 20,000 steps; a first run that allowed a physically impossible leaf swap gave the same numbers and is superseded by \texttt{order\_optimize\_none.json}. The first quire-M proof-of-concept log with a wrong null mask (\texttt{quire\_order\_poc\_M\_maskbug.log}) is superseded by \texttt{quire\_order\_poc\_M.log}.
 
 \section{Supplementary tables}
 \label{app:tables}
 
 \begin{table}[H]
 \centering\small
-\caption{Leaf-pair test on doubletons alone (\cref{sec:leaf}), counts by category against the within-quire-and-language null (2\,000 shuffles). \src{4}}
+\caption{Leaf-pair test on doubletons alone (\cref{sec:leaf}), counts by category against the within-quire-and-language null (2,000 shuffles). \src{4}}
 \begin{tabular}{@{}lcccc@{}}
 \toprule
 category & \IT\ obs / null & $z$ & \RF\ obs / null & $z$\\
@@ -1029,8 +1108,8 @@ $\Dstat$ = conjugate $-$ nested-adjacent & $-9$ / $-13.3 \pm 6.3$ & $\mathbf{+0.
 pairs pooled & \IT & \RF\\
 \midrule
 $k=2$ (896 / 997 pairs) & $+1.0$ / $-0.1$ / $\mathbf{+0.7}$ & $+0.4$ / $+0.5$ / $\mathbf{-0.1}$\\
-$k\in[2,5]$ (4\,839 / 5\,306) & $+2.6$ / $-1.4$ / $\mathbf{+2.5}$ & $+2.0$ / $-0.7$ / $\mathbf{+1.8}$\\
-$k\in[2,10]$ (13\,665 / 14\,625) & $+2.2$ / $-1.8$ / $\mathbf{+2.4}$ & $+2.3$ / $-1.8$ / $\mathbf{+2.5}$\\
+$k\in[2,5]$ (4,839 / 5,306) & $+2.6$ / $-1.4$ / $\mathbf{+2.5}$ & $+2.0$ / $-0.7$ / $\mathbf{+1.8}$\\
+$k\in[2,10]$ (13,665 / 14,625) & $+2.2$ / $-1.8$ / $\mathbf{+2.4}$ & $+2.3$ / $-1.8$ / $\mathbf{+2.5}$\\
 $k\in[2,10]$, Currier $A$ pages only & $+0.7$ / $+0.2$ / $+0.3$ & $+1.4$ / $+0.2$ / $+0.7$\\
 $k\in[2,10]$, Currier $B$ pages only & $+1.1$ / $-1.4$ / $+1.8$ & $+1.0$ / $-1.7$ / $+1.9$\\
 \bottomrule
@@ -1039,7 +1118,7 @@ $k\in[2,10]$, Currier $B$ pages only & $+1.1$ / $-1.4$ / $+1.8$ & $+1.0$ / $-1.7
 
 \begin{table}[H]
 \centering\small
-\caption{Word-level power controls (six texts on the \IT\ page slots, 1\,000 shuffles): $\Dstat$ $z$, $k\in[2,5]$ / $k\in[2,10]$. \src{6.2}}
+\caption{Word-level power controls (six texts on the \IT\ page slots, 1,000 shuffles): $\Dstat$ $z$, $k\in[2,5]$ / $k\in[2,10]$. \src{6.2}}
 \begin{tabular}{@{}lcc@{}}
 \toprule
 control & written nested & written stacked\\
@@ -1079,20 +1158,20 @@ Orlando Furioso & $-2.2$ / $-3.4$ / $-4.0$ ($-1.7$ / $-2.8$ / $-3.1$) & $+1.1$ /
 stream, $W$ & \IT & \RF & hapax fraction\\
 \midrule
 $A$, 512 & 1.607 $\to$ 1.620 ($+3.2$\,sd) & 1.541 $\to$ 1.544 & 0.78--0.80\\
-$A$, 1\,024 & 1.867 $\to$ 1.875 & 1.767 $\to$ 1.769 & 0.75--0.77\\
-$A$, 2\,048 & 2.192 $\to$ 2.206 & 2.035 $\to$ 2.046 & 0.73--0.76\\
-$A$, 4\,096 & 2.638 $\to$ 2.635 & 2.408 $\to$ 2.407 & 0.72--0.74\\
+$A$, 1,024 & 1.867 $\to$ 1.875 & 1.767 $\to$ 1.769 & 0.75--0.77\\
+$A$, 2,048 & 2.192 $\to$ 2.206 & 2.035 $\to$ 2.046 & 0.73--0.76\\
+$A$, 4,096 & 2.638 $\to$ 2.635 & 2.408 $\to$ 2.407 & 0.72--0.74\\
 $B$, 512 & 1.721 $\to$ 1.724 & 1.610 $\to$ 1.613 & 0.75--0.78\\
-$B$, 1\,024 & 2.028 $\to$ 2.032 & 1.870 $\to$ 1.882 ($+3.2$\,sd) & 0.73--0.75\\
-$B$, 2\,048 & 2.422 $\to$ 2.430 & 2.219 $\to$ 2.205 & 0.71--0.73\\
-$B$, 4\,096 & 2.972 $\to$ 2.911 & 2.661 $\to$ 2.606 & 0.70--0.72\\
+$B$, 1,024 & 2.028 $\to$ 2.032 & 1.870 $\to$ 1.882 ($+3.2$\,sd) & 0.73--0.75\\
+$B$, 2,048 & 2.422 $\to$ 2.430 & 2.219 $\to$ 2.205 & 0.71--0.73\\
+$B$, 4,096 & 2.972 $\to$ 2.911 & 2.661 $\to$ 2.606 & 0.70--0.72\\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{table}[H]
 \centering\small
-\caption{Quire M, plain-mean (L1) seriation before the burst-scaled costs (\cref{sec:seriation}): best order (reported at the time up to reversal), $z^\ast$, $p_{\text{best}}$ against shuffled contents, and rank of the current order \order{1-2-3-4-5}, \IT\ / \RF. \src{13}}
+\caption{Quire M, plain-mean (L1) seriation before the cluster-scaled costs (\cref{sec:seriation}): best order (reported at the time up to reversal), $z^\ast$, $p_{\text{best}}$ against shuffled contents, and rank of the current order \order{1-2-3-4-5}, \IT\ / \RF. \src{13}}
 \label{tab:ML1}
 \begin{tabular}{@{}lcccc@{}}
 \toprule
@@ -1109,12 +1188,12 @@ $n=8$ & \order{1-4-2-3-5} / \order{2-3-5-1-4} & $-2.34$ / $-2.42$ & 0.184 / 0.06
 
 \begin{table}[H]
 \centering\footnotesize
-\caption{Quire M, burst-scaled seriation: best order and $p_{\text{best}}$ (content shuffle, 200 draws) per unit and cost, by transcription. The L1 column repeats the plain-mean run of \cref{tab:ML1}; where the record lists two orders for one cell they are the \IT\ and \RF\ winners respectively. Bold: $p\le0.015$. \src{13, 14}}
-\label{tab:Mburst}
+\caption{Quire M, cluster-scaled seriation: best order and $p_{\text{best}}$ (content shuffle, 200 draws) per unit and cost, by transcription. The L1 column repeats the plain-mean run of \cref{tab:ML1}; where the record lists two orders for one cell they are the \IT\ and \RF\ winners respectively. Bold: $p\le0.015$. \src{13, 14}}
+\label{tab:Mcluster}
 \setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.1}
 \begin{tabular}{@{}lL{3.1cm}L{3.1cm}L{3.1cm}L{3.1cm}@{}}
 \toprule
-unit & L1 & burst & blog & modal\\
+unit & L1 & cluster & blog & modal\\
 \midrule
 \multicolumn{5}{@{}l}{\IT}\\
 words & \order{2-3-5-1-4}, 0.025 & \order{2-3-5-1-4}, 0.40 & \order{2-3-5-1-4}, 0.38 & \order{2-3-5-1-4}, 0.19\\

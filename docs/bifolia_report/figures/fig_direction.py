@@ -6,9 +6,9 @@
     in the null).  Quires T, M, C; units words, 5..8-grams; metrics L1 and modal
     (nullshape run).  Source: quire_order_nullshape_{T,M,C}.json (null quantiles) and
     quire_order_direction_{T,M,C}.json (real Δ, p; IT2a).  docs/doubleton_gaps.md §16-17.
-(b) Burst front-loading: fraction of rare types (3-10 occurrences inside one segment)
-    whose first inter-occurrence gap is shorter than the last.  0.5 = symmetric burst.
-    Prose: six known texts (1 500-token segments) and pooled; manuscript: sheets read
+(b) Cluster front-loading: fraction of rare types (3-10 occurrences inside one segment)
+    whose first inter-occurrence gap is shorter than the last.  0.5 = symmetric cluster.
+    Prose: six known texts (1,500-token segments) and pooled; manuscript: sheets read
     a-r, a-v, b-r, b-v (all / Currier A / Currier B) and single pages, both
     transcriptions.  Source: burst_frontloading.json (§18).
 """
@@ -108,7 +108,7 @@ l += ["known text", "VMS IT2a", "VMS RF1b"]
 ax.legend(h, l, loc="upper left", bbox_to_anchor=(0.0, -0.17), ncol=5, fontsize=6.4, frameon=False, handletextpad=0.3, columnspacing=0.9)
 ax.set_xticks(xs)
 ax.set_xticklabels([g[0] for g in groups], fontsize=7)
-ax.set_ylabel("fraction of bursts with first gap < last gap\n(0.5 = time-symmetric burst)", fontsize=7.2)
+ax.set_ylabel("fraction of clusters with first gap < last gap\n(0.5 = time-symmetric cluster)", fontsize=7.2)
 ax.set_ylim(0.40, 0.58)
 ax.annotate("Currier A sheets, glyph n-grams: back-loaded\n(p 0.005–0.10 vs within-sheet page permutation,\ndriven by k = 3 types; words show nothing)",
             xy=(xs[3] + 0.1, 0.462), xytext=(xs[3] + 0.55, 0.425), fontsize=6.0, color=INK2, ha="left", va="bottom",

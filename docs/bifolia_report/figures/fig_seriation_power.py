@@ -14,8 +14,9 @@ from style import *  # noqa
 QUIRES = ["T", "M", "C", "A", "B"]
 NCAND = {"T": 720, "M": 120, "C": 24, "A": 24, "B": 24}
 NSHEETS = {"T": 6, "M": 5, "C": 4, "A": 4, "B": 4}
-TOKENS = {"T": "10 673", "M": "6 911", "C": "1 401", "A": "1 495", "B": "1 019"}
-METRICS = ["L1", "burst", "blog", "modal"]
+TOKENS = {"T": "10,673", "M": "6,911", "C": "1,401", "A": "1,495", "B": "1,019"}
+METRICS = ["L1", "burst", "blog", "modal"]  # JSON keys
+LABELS = ["L1", "cluster", "blog", "modal"]  # display names
 LANG = {"la": ("Latin (Isidore)", MARK_LANG["la"]), "de": ("German (Bullinger)", MARK_LANG["de"]),
         "it": ("Italian (Decameron)", MARK_LANG["it"])}
 
@@ -59,7 +60,7 @@ for ax, Q in zip(axes, QUIRES):
     ax.set_yticks([1, 10, 100, 720] if N == 720 else ([1, 10, 120] if N == 120 else [1, 10, 24]))
     ax.set_yticklabels([str(t) for t in ax.get_yticks()])
     ax.set_xticks(range(4))
-    ax.set_xticklabels(METRICS, fontsize=6.8, rotation=40, ha="right", rotation_mode="anchor")
+    ax.set_xticklabels(LABELS, fontsize=6.8, rotation=40, ha="right", rotation_mode="anchor")
     ax.set_xlim(-0.6, 3.6)
     ax.set_title(f"quire {Q}\n{NSHEETS[Q]}! = {N} orders", fontsize=7.2, pad=12)
     if Q == "T":

@@ -1,8 +1,8 @@
 """Figure: how often does even spreading of the rare material reproduce the observed
-D = conjugate − nested-adjacent excess?  Empirical tail from 5 000 permutation draws
+D = conjugate − nested-adjacent excess?  Empirical tail from 5,000 permutation draws
 per cell (§12; data/leaf_test_pvalue.json).
 
-y = empirical p = (#draws ≥ observed + 1)/(n + 1), log scale; a cell with 0/5 000
+y = empirical p = (#draws ≥ observed + 1)/(n + 1), log scale; a cell with 0/5,000
 draws sits on the floor 1/5001 and is labelled "0".  Filled: null permutes page
 contents within quire × language; hollow: also within scribal hand.  Small crosses:
 normal-tail p for the recorded z (for reference only).
@@ -45,8 +45,8 @@ for i, (ukey, ulab) in enumerate(UNITS):
 ax.set_yscale("log")
 ax.set_ylim(2e-7, 0.25)
 ax.axhline(FLOOR, color=AXIS, lw=0.8, ls=(0, (3, 2)), zorder=1)
-ax.text(-0.5, FLOOR * 0.62, "floor: 0 / 5 000 draws", fontsize=6.3, color=MUTED, ha="left", va="top")
-for pv, lab in ((0.05, "0.05"), (0.01, "0.01"), (0.001, "1/1000")):
+ax.text(-0.5, FLOOR * 0.62, "floor: 0 / 5,000 draws", fontsize=6.3, color=MUTED, ha="left", va="top")
+for pv, lab in ((0.05, "0.05"), (0.01, "0.01"), (0.001, "1/1,000")):
     ax.axhline(pv, color=GRID, lw=0.6, zorder=0)
 ax.set_yticks([0.1, 0.01, 1e-3, 1e-4, 1e-5, 1e-6])
 ax.set_yticklabels(["0.1", "0.01", "10$^{-3}$", "10$^{-4}$", "10$^{-5}$", "10$^{-6}$"])

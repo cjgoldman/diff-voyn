@@ -19,6 +19,32 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
+# LaTeX toolchain for the reports under docs/ (e.g. docs/bifolia_report: pdflatex
+# via latexmk; Palatino/Helvetica/Courier, siunitx, tikz, tcolorbox, cleveref, ...).
+# texlive-extra-utils brings latexindent; poppler-utils (pdftoppm/pdfinfo) and
+# ghostscript are for PDF inspection and matplotlib's PDF/usetex paths.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    texlive-latex-base \
+    texlive-latex-recommended \
+    texlive-latex-extra \
+    texlive-fonts-recommended \
+    texlive-pictures \
+    texlive-science \
+    texlive-bibtex-extra \
+    texlive-extra-utils \
+    texlive-xetex \
+    texlive-luatex \
+    lmodern \
+    cm-super \
+    dvipng \
+    latexmk \
+    biber \
+    chktex \
+    lacheck \
+    ghostscript \
+    poppler-utils \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /workspace
 
 
